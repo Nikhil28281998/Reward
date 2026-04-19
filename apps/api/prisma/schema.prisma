@@ -1,0 +1,301 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum OcrStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum FilingStatus {
+  SINGLE
+  MARRIED_JOINT
+  MARRIED_SEPARATE
+  HEAD_OF_HOUSEHOLD
+}
+
+enum RecommendationCategory {
+  UPGRADE
+  COMPLEMENT
+  REPLACE
+  FIRST_CARD
+  TRAVEL
+  CASHBACK
+  DINING
+  GAS
+}
+
+enum OfferType {
+  CASHBACK
+  POINTS_BONUS
+  STATEMENT_CREDIT
+  GIFT_CARD
+}
+
+enum ValueType {
+  PERCENTAGE
+  FIXED
+}
+
+enum PlanStatus {
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+// ─── Models ───────────────────────────────────────────────────────────────────
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  fullName     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  cardAccounts     CardAccount[]
+  statements       Statement[]
+  incomeProfile    UserIncomeProfile?
+  planInstances    PlanInstance[]
+  dataSourceEvents DataSourceEvent[]
+  consentRecords   ConsentRecord[]
+}
+
+model CardProduct {
+  id            String  @id @default(cuid())
+  issuer        String
+  name          String
+  fullName      String
+  network       String
+  annualFee     Decimal
+  signupBonus   Int?
+  signupSpendReq Decimal?
+  signupMonths  Int?
+  rewardCurrency String
+  baseEarnRate  Decimal
+  categoryRates Json    // CategoryRate[]
+  redeemValues  Json    // RedeemValue[]
+  benefits      Json    // CardBenefit[]
+  foreignTransFee Decimal @default(0)
+  creditScoreMin  Int?
+  referralUrl   String?
+  imageUrl      String?
+  gradient      String[] @default(["#7C3AED", "#5B21B6"])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  cardAccounts    CardAccount[]
+  recommendations Recommendation[]
+  offers          Offer[]
+}
+
+model CardAccount {
+  id            String  @id @default(cuid())
+  userId        String
+  cardProductId String
+  last4         String?
+  nickname      String?
+  creditLimit   Decimal?
+  currentBalance  Decimal @default(0)
+  statementBalance Decimal @default(0)
+  availableCredit Decimal?
+  rewardBalance  Int     @default(0)
+  statementClosingDay Int?
+  paymentDueDay  Int?
+  isActive      Boolean @default(true)
+  openedAt      DateTime?
+  closedAt      DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user         User            @relation(fields: [userId], references: [id])
+  cardProduct  CardProduct     @relation(fields: [cardProductId], references: [id])
+  statements   Statement[]
+  transactions TransactionCanonical[]
+}
+
+model Statement {
+  id            String    @id @default(cuid())
+  userId        String
+  cardAccountId String?
+  fileKey       String
+  fileName      String
+  mimeType      String
+  fileSize      Int?
+  periodStart   DateTime?
+  periodEnd     DateTime?
+  totalCharges  Decimal?
+  totalCredits  Decimal?
+  ocrStatus     OcrStatus @default(PENDING)
+  ocrRawText    String?   @db.Text
+  ocrConfidence Float?
+  processingError String?
+  detectedIssuer  String?
+  detectedLast4   String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user            User                  @relation(fields: [userId], references: [id])
+  cardAccount     CardAccount?          @relation(fields: [cardAccountId], references: [id])
+  rawTransactions TransactionRaw[]
+}
+
+model TransactionRaw {
+  id              String  @id @default(cuid())
+  statementId     String
+  rawDate         String?
+  rawDescription  String?
+  rawAmount       String?
+  rawCategory     String?
+  parsedDate      DateTime?
+  parsedAmount    Decimal?
+  lineNumber      Int?
+  confidence      Float?
+  canonicalId     String? @unique
+
+  statement  Statement              @relation(fields: [statementId], references: [id])
+  canonical  TransactionCanonical?  @relation(fields: [canonicalId], references: [id])
+}
+
+model TransactionCanonical {
+  id            String  @id @default(cuid())
+  cardAccountId String
+  date          DateTime
+  description   String
+  amount        Decimal
+  category      String
+  subcategory   String?
+  merchantName  String?
+  merchantCity  String?
+  merchantState String?
+  isCredit      Boolean @default(false)
+  rewardEarned  Int?
+  rewardRate    Decimal?
+  tags          String[] @default([])
+  notes         String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  cardAccount    CardAccount    @relation(fields: [cardAccountId], references: [id])
+  rawTransaction TransactionRaw?
+
+  @@index([cardAccountId, date])
+}
+
+model UserIncomeProfile {
+  id               String       @id @default(cuid())
+  userId           String       @unique
+  annualIncome     Decimal
+  filingStatus     FilingStatus @default(SINGLE)
+  state            String?
+  estimatedTaxRate Decimal?
+
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id])
+}
+
+model Recommendation {
+  id              String                 @id @default(cuid())
+  cardProductId   String
+  userId          String?
+  matchScore      Float
+  estimatedValue  Decimal
+  reasoning       String[]
+  category        RecommendationCategory
+  isSponsored     Boolean @default(false)
+  isActive        Boolean @default(true)
+  expiresAt       DateTime?
+
+  createdAt DateTime @default(now())
+
+  cardProduct CardProduct @relation(fields: [cardProductId], references: [id])
+
+  @@index([userId, isActive])
+}
+
+model Offer {
+  id                 String    @id @default(cuid())
+  cardProductId      String?
+  merchantName       String
+  merchantLogoUrl    String?
+  merchantCategory   String
+  offerType          OfferType
+  value              Decimal
+  valueType          ValueType
+  displayValue       String
+  activationRequired Boolean   @default(false)
+  activationUrl      String?
+  termsUrl           String?
+  startDate          DateTime?
+  endDate            DateTime?
+  isActive           Boolean   @default(true)
+
+  createdAt DateTime @default(now())
+
+  cardProduct CardProduct? @relation(fields: [cardProductId], references: [id])
+
+  @@index([isActive, merchantCategory])
+}
+
+model PlanInstance {
+  id            String     @id @default(cuid())
+  userId        String
+  name          String
+  destination   String?
+  targetDate    DateTime?
+  pointsGoal    Int?
+  currentPoints Int?
+  status        PlanStatus @default(ACTIVE)
+  recommendations Json    @default("[]")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id])
+}
+
+model DataSourceEvent {
+  id         String @id @default(cuid())
+  userId     String
+  source     String
+  entityType String
+  entityId   String
+  payload    Json
+
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId, entityType])
+}
+
+model ConsentRecord {
+  id          String  @id @default(cuid())
+  userId      String
+  consentType String
+  granted     Boolean
+  ipAddress   String?
+  userAgent   String?
+
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+}

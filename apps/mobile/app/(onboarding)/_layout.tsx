@@ -1,0 +1,18 @@
+import { Stack } from 'expo-router';
+import { Colors } from '../../constants/theme';
+
+export default function OnboardingLayout() {
+  return (
+    <Stack
+      screenOptions={{
+        headerShown: false,
+        contentStyle: { backgroundColor: Colors.background },
+        animation: 'slide_from_right',
+      }}
+    >
+      <Stack.Screen name="upload" />
+      <Stack.Screen name="cards-confirm" />
+      <Stack.Screen name="income" />
+    </Stack>
+  );
+}
