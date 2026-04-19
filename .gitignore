@@ -1,0 +1,43 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+
+# Node and package managers
+node_modules/
+dist/
+build/
+.turbo/
+.next/
+coverage/
+*.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Python (for OCR workers if used)
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Env and secrets
+.env
+.env.*
+!.env.example
+
+# Runtime
+*.log
+tmp/
+
+# Mobile
+android/.gradle/
+android/app/build/
+ios/Pods/
+ios/build/
