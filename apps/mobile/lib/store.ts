@@ -161,3 +161,50 @@ export const useWealthStore = create<WealthState>()(
     },
   ),
 );
+
+// ─── Plans Store (adopted financial frameworks — persisted) ─────────────────
+
+export type AdoptedPlan = {
+  id: string;
+  templateId: string;       // matches Template.id in planning.tsx
+  adoptedAt: number;
+  params?: Record<string, number>; // e.g. { monthlyIncome: 5000, goal: 3000 }
+};
+
+interface PlansState {
+  monthlyIncome: number;    // 0 means "not set yet"
+  adoptedPlans: AdoptedPlan[];
+  setMonthlyIncome: (v: number) => void;
+  adoptPlan: (templateId: string, params?: Record<string, number>) => void;
+  removePlan: (id: string) => void;
+  isAdopted: (templateId: string) => boolean;
+}
+
+export const usePlansStore = create<PlansState>()(
+  persist(
+    (set, get) => ({
+      monthlyIncome: 0,
+      adoptedPlans: [],
+      setMonthlyIncome: (v) => set({ monthlyIncome: Math.max(0, v) }),
+      adoptPlan: (templateId, params) =>
+        set((s) => {
+          // toggle: if already adopted, do nothing (removal uses removePlan)
+          if (s.adoptedPlans.some((p) => p.templateId === templateId)) return s;
+          return {
+            adoptedPlans: [
+              ...s.adoptedPlans,
+              { id: genId(), templateId, adoptedAt: Date.now(), params },
+            ],
+          };
+        }),
+      removePlan: (id) =>
+        set((s) => ({ adoptedPlans: s.adoptedPlans.filter((p) => p.id !== id && p.templateId !== id) })),
+      isAdopted: (templateId) => get().adoptedPlans.some((p) => p.templateId === templateId),
+    }),
+    {
+      name: 'labhly_plans_v1',
+      storage: webStorage,
+      partialize: (s) => ({ monthlyIncome: s.monthlyIncome, adoptedPlans: s.adoptedPlans }),
+    },
+  ),
+);

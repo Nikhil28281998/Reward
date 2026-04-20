@@ -18,6 +18,9 @@ import { CardCarousel } from '../../components/ui/CardCarousel';
 import { TransactionFeed } from '../../components/ui/TransactionFeed';
 import { InsightHero, type Insight } from '../../components/ui/InsightHero';
 import { CATEGORIES, formatUSD } from '@reward/shared';
+import { usePlansStore } from '../../lib/store';
+import { FRAMEWORK_TEMPLATES, computeInsight, type FrameworkId } from '../../lib/planning/frameworks';
+import { useRecommendations } from '../../hooks/useRecommendations';
 
 export default function HomeScreen() {
   const scrollY = useSharedValue(0);
@@ -55,6 +58,38 @@ export default function HomeScreen() {
   const totalBalance = cardList.reduce((s, c) => s + Number(c.currentBalance), 0);
   const utilPct = totalLimit > 0 ? Math.round((totalBalance / totalLimit) * 100) : 0;
   const monthSpend = spendSummary?.totalSpend ?? 0;
+
+  // ─── Plan-derived insights (50/30/20, emergency fund, debt snowball …) ────
+  const { monthlyIncome, adoptedPlans } = usePlansStore();
+  const { recommendations } = useRecommendations();
+
+  const planInsights = useMemo<Insight[]>(() => {
+    if (adoptedPlans.length === 0) return [];
+    const spendByCategory: Record<string, number> = {};
+    for (const c of spendSummary?.categories ?? []) {
+      const amt = Number((c as any).totalAmount ?? (c as any).amount ?? 0);
+      if (amt > 0) spendByCategory[c.category] = amt;
+    }
+    const cardsForPlan = cardList.map((c) => ({
+      id: c.id,
+      name: c.cardProduct?.name ?? c.nickname ?? 'Card',
+      balance: Number(c.currentBalance ?? 0),
+      apr: (c as any).apr as number | undefined,
+      limit: Number(c.creditLimit ?? 0),
+    }));
+    const out: Insight[] = [];
+    for (const plan of adoptedPlans) {
+      const insight = computeInsight(plan.templateId as FrameworkId, {
+        monthlyIncome,
+        monthSpend,
+        spendByCategory,
+        liabilitiesTotal: cardsForPlan.reduce((s, c) => s + c.balance, 0),
+        cards: cardsForPlan,
+      });
+      if (insight) out.push(insight);
+    }
+    return out;
+  }, [adoptedPlans, monthlyIncome, monthSpend, spendSummary, cardList]);
 
   // ─── Compute live insights from real data ─────────────────────────────────
   const insights = useMemo<Insight[]>(() => {
@@ -112,6 +147,18 @@ export default function HomeScreen() {
     return out;
   }, [cardList, spendSummary, utilPct, totalLimit, monthSpend]);
 
+  // Interleave plan insights at the top so an adopted 50/30/20 shows first.
+  const heroInsights = useMemo<Insight[]>(
+    () => [...planInsights, ...insights],
+    [planInsights, insights],
+  );
+
+  // Top sponsored partner card (referral revenue slot)
+  const sponsored = useMemo(() => {
+    const list = recommendations ?? [];
+    return list.find((r) => (r as any).isSponsored) ?? list[0] ?? null;
+  }, [recommendations]);
+
   const quickActions = [
     { id: 'best',     emoji: '⚡', label: 'Best card now',    sub: 'Per purchase',    onPress: () => router.push('/best-card') },
     { id: 'planning', emoji: '🎯', label: 'Plan a goal',      sub: 'AI playbooks',    onPress: () => router.push('/planning') },
@@ -154,7 +201,7 @@ export default function HomeScreen() {
       >
         {/* AI Insight Hero */}
         <View style={{ marginHorizontal: wp(5), marginTop: Spacing['2'] }}>
-          <InsightHero insights={insights} />
+          <InsightHero insights={heroInsights} />
         </View>
 
         {/* Wealth glass card */}
@@ -194,6 +241,41 @@ export default function HomeScreen() {
             </View>
           </View>
         </View>
+
+        {/* Sponsored partner slot */}
+        {sponsored ? (
+          <Pressable
+            onPress={() => router.push('/(tabs)/discover')}
+            style={({ pressed }) => [styles.partner, { marginHorizontal: wp(5), opacity: pressed ? 0.92 : 1 }]}
+          >
+            <LinearGradient
+              colors={['rgba(245,158,11,0.14)', 'rgba(236,72,153,0.08)']}
+              start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+              style={StyleSheet.absoluteFill}
+            />
+            <View style={styles.partnerHead}>
+              <Text style={[styles.partnerKicker, { fontSize: moderateScale(9) }]}>
+                PARTNER OFFER · EARN WITH LABHLY
+              </Text>
+              <Text style={[styles.partnerClose, { fontSize: moderateScale(11) }]}>›</Text>
+            </View>
+            <Text style={[styles.partnerTitle, { fontSize: moderateScale(15) }]} numberOfLines={2}>
+              {(sponsored as any).cardProduct?.name ?? (sponsored as any).name ?? 'Featured rewards card'}
+            </Text>
+            <Text style={[styles.partnerBody, { fontSize: moderateScale(12) }]} numberOfLines={2}>
+              {(sponsored as any).reasoning ?? (sponsored as any).description ?? 'A card worth a look for your spend profile.'}
+            </Text>
+            {((sponsored as any).estimatedAnnualValue ?? 0) > 0 ? (
+              <View style={styles.partnerChipRow}>
+                <View style={styles.partnerChip}>
+                  <Text style={[styles.partnerChipText, { fontSize: moderateScale(10) }]}>
+                    ~${Math.round((sponsored as any).estimatedAnnualValue ?? 0)}/yr potential
+                  </Text>
+                </View>
+              </View>
+            ) : null}
+          </Pressable>
+        ) : null}
 
         {/* Quick action strip */}
         <ScrollView
@@ -283,4 +365,23 @@ const styles = StyleSheet.create({
   sectionHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: wp(5), marginTop: Spacing['6'], marginBottom: Spacing['3'] },
   sectionTitle: { color: Colors.text, fontWeight: Typography.weight.bold, letterSpacing: -0.2 },
   sectionAction: { color: Colors.primaryLight, fontWeight: Typography.weight.semibold },
+
+  // Sponsored partner slot
+  partner: {
+    marginTop: Spacing['4'],
+    borderRadius: Radius['2xl'],
+    padding: Spacing['4'],
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(245, 158, 11, 0.32)',
+    backgroundColor: Colors.surface,
+  },
+  partnerHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: Spacing['2'] },
+  partnerKicker: { color: '#F59E0B', letterSpacing: 1.4, fontWeight: Typography.weight.bold },
+  partnerClose: { color: Colors.textMuted, fontWeight: Typography.weight.bold },
+  partnerTitle: { color: Colors.text, fontWeight: Typography.weight.bold, letterSpacing: -0.2 },
+  partnerBody: { color: Colors.textSecondary, marginTop: 4, lineHeight: 18 },
+  partnerChipRow: { flexDirection: 'row', gap: Spacing['2'], marginTop: Spacing['3'] },
+  partnerChip: { backgroundColor: 'rgba(16,185,129,0.18)', borderWidth: 1, borderColor: 'rgba(16,185,129,0.4)', paddingHorizontal: Spacing['2'], paddingVertical: 3, borderRadius: Radius.full },
+  partnerChipText: { color: Colors.accentLight, fontWeight: Typography.weight.bold },
 });

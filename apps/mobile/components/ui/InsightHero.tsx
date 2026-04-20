@@ -33,10 +33,16 @@ export function InsightHero({ insights, rotateMs = 6000, style }: InsightHeroPro
 
   const fade = useSharedValue(1);
   const aurora = useSharedValue(0);
+  const aurora2 = useSharedValue(0);
+  const orb1 = useSharedValue(0);
+  const orb2 = useSharedValue(0);
   const [jsIdx, setJsIdx] = React.useState(0);
 
   useEffect(() => {
     aurora.value = withRepeat(withTiming(1, { duration: 4500, easing: Easing.inOut(Easing.sin) }), -1, true);
+    aurora2.value = withRepeat(withTiming(1, { duration: 6800, easing: Easing.inOut(Easing.sin) }), -1, true);
+    orb1.value = withRepeat(withTiming(1, { duration: 9000, easing: Easing.inOut(Easing.quad) }), -1, true);
+    orb2.value = withRepeat(withTiming(1, { duration: 11000, easing: Easing.inOut(Easing.quad) }), -1, true);
     if (safe.length <= 1) return;
     const id = setInterval(() => {
       fade.value = withSequence(
@@ -46,7 +52,7 @@ export function InsightHero({ insights, rotateMs = 6000, style }: InsightHeroPro
       setTimeout(() => setJsIdx((i) => (i + 1) % safe.length), 260);
     }, rotateMs);
     return () => clearInterval(id);
-  }, [rotateMs, safe.length, fade, aurora]);
+  }, [rotateMs, safe.length, fade, aurora, aurora2, orb1, orb2]);
 
   const fadeStyle = useAnimatedStyle(() => ({
     opacity: fade.value,
@@ -56,6 +62,30 @@ export function InsightHero({ insights, rotateMs = 6000, style }: InsightHeroPro
   const auroraStyle = useAnimatedStyle(() => ({
     opacity: interpolate(aurora.value, [0, 1], [0.55, 1]),
     transform: [{ translateX: interpolate(aurora.value, [0, 1], [-30, 30]) }],
+  }));
+
+  const aurora2Style = useAnimatedStyle(() => ({
+    opacity: interpolate(aurora2.value, [0, 1], [0.3, 0.75]),
+    transform: [
+      { translateX: interpolate(aurora2.value, [0, 1], [40, -40]) },
+      { translateY: interpolate(aurora2.value, [0, 1], [10, -10]) },
+    ],
+  }));
+
+  const orb1Style = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: interpolate(orb1.value, [0, 1], [-20, 180]) },
+      { translateY: interpolate(orb1.value, [0, 1], [-10, 40]) },
+    ],
+    opacity: interpolate(orb1.value, [0, 0.5, 1], [0.4, 0.7, 0.4]),
+  }));
+
+  const orb2Style = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: interpolate(orb2.value, [0, 1], [220, 20]) },
+      { translateY: interpolate(orb2.value, [0, 1], [80, 20]) },
+    ],
+    opacity: interpolate(orb2.value, [0, 0.5, 1], [0.25, 0.55, 0.25]),
   }));
 
   const current = safe[jsIdx];
@@ -71,6 +101,16 @@ export function InsightHero({ insights, rotateMs = 6000, style }: InsightHeroPro
             style={StyleSheet.absoluteFill}
           />
         </Animated.View>
+        <Animated.View style={[StyleSheet.absoluteFill, aurora2Style]}>
+          <LinearGradient
+            colors={['#F59E0B', '#EC4899', '#3B82F6']}
+            start={{ x: 1, y: 0 }} end={{ x: 0, y: 1 }}
+            style={StyleSheet.absoluteFill}
+          />
+        </Animated.View>
+        {/* Floating light orbs */}
+        <Animated.View style={[styles.orb, styles.orbA, orb1Style]} />
+        <Animated.View style={[styles.orb, styles.orbB, orb2Style]} />
         {/* Frosted overlay */}
         <View style={styles.frost} />
       </View>
@@ -117,7 +157,10 @@ const styles = StyleSheet.create({
     ...Shadow.primaryGlow,
   },
   auroraWrap: { ...StyleSheet.absoluteFillObject, overflow: 'hidden' },
-  frost: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(9,9,11,0.78)' },
+  frost: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(9,9,11,0.72)' },
+  orb: { position: 'absolute', width: 140, height: 140, borderRadius: 70 },
+  orbA: { backgroundColor: 'rgba(168, 85, 247, 0.45)', top: -30, left: -20 },
+  orbB: { backgroundColor: 'rgba(59, 130, 246, 0.35)', top: 20, right: -40 },
   header: { flexDirection: 'row', alignItems: 'center', gap: Spacing['2'], marginBottom: Spacing['3'] },
   dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.accent, ...Shadow.accentGlow },
   kicker: { color: Colors.textSecondary, letterSpacing: 1.4, fontWeight: Typography.weight.bold, flex: 1 },

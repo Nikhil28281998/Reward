@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Pressable, ScrollView, Modal } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ScrollView, Modal, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -8,6 +8,8 @@ import { moderateScale, wp } from '../lib/responsive';
 import { useCards } from '../hooks/useCards';
 import { AIAvatar } from '../components/ui/AIAvatar';
 import { formatUSD } from '@reward/shared';
+import { FRAMEWORK_TEMPLATES, type FrameworkTemplate } from '../lib/planning/frameworks';
+import { usePlansStore } from '../lib/store';
 
 type Template = {
   id: string;
@@ -147,6 +149,24 @@ export default function PlanningScreen() {
   const estimatedCash = totalPoints * 0.015;
 
   const [open, setOpen] = useState<Template | null>(null);
+  const [openFw, setOpenFw] = useState<FrameworkTemplate | null>(null);
+  const [incomeDraft, setIncomeDraft] = useState('');
+  const { monthlyIncome, setMonthlyIncome, adoptedPlans, adoptPlan, removePlan } = usePlansStore();
+
+  const isAdopted = (id: string) => adoptedPlans.some((p) => p.templateId === id);
+
+  const handleAdoptFramework = (fw: FrameworkTemplate) => {
+    if (fw.needsIncome && monthlyIncome <= 0) {
+      const n = parseFloat(incomeDraft.replace(/[^0-9.]/g, ''));
+      if (!n || n <= 0) return; // keep modal open, user sees prompt
+      setMonthlyIncome(n);
+      adoptPlan(fw.id, { monthlyIncome: n });
+    } else {
+      adoptPlan(fw.id, monthlyIncome > 0 ? { monthlyIncome } : undefined);
+    }
+    setOpenFw(null);
+    setIncomeDraft('');
+  };
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -206,6 +226,46 @@ export default function PlanningScreen() {
             </Pressable>
           ))}
         </View>
+
+        {/* ── Finance frameworks ──────────────────────────────────────────── */}
+        <View style={{ paddingHorizontal: wp(5), marginTop: Spacing['8'] }}>
+          <Text style={[styles.sectionKicker, { fontSize: moderateScale(11) }]}>
+            BUDGETING FRAMEWORKS
+          </Text>
+          <Text style={[styles.sectionTitle, { fontSize: moderateScale(20) }]}>
+            Add a budget to your account
+          </Text>
+          <Text style={[styles.sectionSub, { fontSize: moderateScale(13) }]}>
+            Adopt a classic like 50/30/20 — Labhly plugs in your real spend and shows a live insight on Home.
+          </Text>
+        </View>
+        <View style={styles.frameworkList}>
+          {FRAMEWORK_TEMPLATES.map((fw) => {
+            const adopted = isAdopted(fw.id);
+            return (
+              <Pressable
+                key={fw.id}
+                onPress={() => setOpenFw(fw)}
+                style={({ pressed }) => [styles.fwRow, { opacity: pressed ? 0.85 : 1 }]}
+              >
+                <View style={[styles.fwIcon, { backgroundColor: `${fw.colors[0]}33`, borderColor: `${fw.colors[0]}55` }]}>
+                  <Text style={{ fontSize: 22 }}>{fw.emoji}</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.fwTitle, { fontSize: moderateScale(14) }]}>{fw.title}</Text>
+                  <Text style={[styles.fwSub, { fontSize: moderateScale(12) }]}>{fw.sub}</Text>
+                </View>
+                {adopted ? (
+                  <View style={styles.fwBadge}>
+                    <Text style={[styles.fwBadgeText, { fontSize: moderateScale(10) }]}>ACTIVE</Text>
+                  </View>
+                ) : (
+                  <Text style={[styles.fwChev, { fontSize: moderateScale(20) }]}>›</Text>
+                )}
+              </Pressable>
+            );
+          })}
+        </View>
       </ScrollView>
 
       {/* Template detail modal */}
@@ -253,6 +313,83 @@ export default function PlanningScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Framework adoption modal */}
+      <Modal visible={!!openFw} animationType="slide" transparent onRequestClose={() => setOpenFw(null)}>
+        <View style={styles.sheetScrim}>
+          <View style={styles.sheet}>
+            {openFw && (
+              <>
+                <LinearGradient
+                  colors={[`${openFw.colors[0]}33`, 'transparent']}
+                  style={StyleSheet.absoluteFill}
+                />
+                <View style={styles.sheetHead}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing['3'], flex: 1 }}>
+                    <Text style={{ fontSize: 32 }}>{openFw.emoji}</Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.sheetTitle, { fontSize: moderateScale(20) }]}>{openFw.title}</Text>
+                      <Text style={[styles.sheetSub, { fontSize: moderateScale(12) }]}>{openFw.horizon}</Text>
+                    </View>
+                  </View>
+                  <Pressable onPress={() => setOpenFw(null)} style={styles.sheetClose} hitSlop={10}>
+                    <Text style={styles.sheetCloseText}>✕</Text>
+                  </Pressable>
+                </View>
+
+                <Text style={[styles.fwBlurb, { fontSize: moderateScale(14) }]}>{openFw.blurb}</Text>
+
+                <Text style={[styles.playbookKicker, { fontSize: moderateScale(11), marginTop: Spacing['4'] }]}>HOW IT WORKS</Text>
+                {openFw.playbook.map((step, i) => (
+                  <View key={i} style={styles.step}>
+                    <View style={[styles.stepNum, { backgroundColor: openFw.colors[0] }]}>
+                      <Text style={styles.stepNumText}>{i + 1}</Text>
+                    </View>
+                    <Text style={[styles.stepText, { fontSize: moderateScale(14) }]}>{step}</Text>
+                  </View>
+                ))}
+
+                {openFw.needsIncome && monthlyIncome <= 0 && !isAdopted(openFw.id) ? (
+                  <View style={{ marginTop: Spacing['4'] }}>
+                    <Text style={[styles.incomeLabel, { fontSize: moderateScale(11) }]}>YOUR MONTHLY TAKE-HOME</Text>
+                    <TextInput
+                      value={incomeDraft}
+                      onChangeText={(t) => setIncomeDraft(t.replace(/[^0-9.]/g, ''))}
+                      placeholder="e.g. 5000"
+                      placeholderTextColor={Colors.textMuted}
+                      inputMode="decimal"
+                      keyboardType="decimal-pad"
+                      style={[styles.incomeInput, { fontSize: moderateScale(18) }]}
+                    />
+                    <Text style={[styles.incomeHint, { fontSize: moderateScale(11) }]}>
+                      Used only on your device to compute your split.
+                    </Text>
+                  </View>
+                ) : null}
+
+                {isAdopted(openFw.id) ? (
+                  <Pressable
+                    onPress={() => { removePlan(openFw.id); setOpenFw(null); }}
+                    style={({ pressed }) => [styles.sheetCta, styles.sheetCtaDanger, { opacity: pressed ? 0.9 : 1 }]}
+                  >
+                    <Text style={styles.sheetCtaText}>Remove from my plan</Text>
+                  </Pressable>
+                ) : (
+                  <Pressable
+                    onPress={() => handleAdoptFramework(openFw)}
+                    style={({ pressed }) => [styles.sheetCta, { opacity: pressed ? 0.9 : 1 }]}
+                  >
+                    <LinearGradient colors={openFw.colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
+                    <Text style={styles.sheetCtaText}>
+                      {openFw.needsIncome && monthlyIncome <= 0 && !incomeDraft ? 'Enter income to activate' : '＋ Add to my plan'}
+                    </Text>
+                  </Pressable>
+                )}
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -293,4 +430,23 @@ const styles = StyleSheet.create({
 
   sheetCta: { marginTop: Spacing['5'], height: 52, borderRadius: Radius.xl, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', ...Shadow.primaryGlow },
   sheetCtaText: { color: Colors.white, fontWeight: Typography.weight.bold, fontSize: 15, letterSpacing: 0.3 },
+  sheetCtaDanger: { backgroundColor: Colors.dangerMuted, borderWidth: 1, borderColor: Colors.danger },
+
+  sectionKicker: { color: Colors.primaryLight, letterSpacing: 1.5, fontWeight: Typography.weight.bold, marginBottom: Spacing['2'] },
+  sectionTitle: { color: Colors.text, fontWeight: Typography.weight.extrabold, letterSpacing: -0.4 },
+  sectionSub: { color: Colors.textSecondary, marginTop: Spacing['2'], lineHeight: 19 },
+
+  frameworkList: { paddingHorizontal: wp(5), paddingTop: Spacing['4'], gap: Spacing['2'] },
+  fwRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing['3'], padding: Spacing['3'], backgroundColor: Colors.surface, borderRadius: Radius.xl, borderWidth: 1, borderColor: Colors.border },
+  fwIcon: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
+  fwTitle: { color: Colors.text, fontWeight: Typography.weight.bold },
+  fwSub: { color: Colors.textSecondary, marginTop: 2 },
+  fwChev: { color: Colors.textMuted, fontWeight: Typography.weight.bold },
+  fwBadge: { backgroundColor: 'rgba(16,185,129,0.18)', borderWidth: 1, borderColor: 'rgba(16,185,129,0.4)', paddingHorizontal: Spacing['2'], paddingVertical: 3, borderRadius: Radius.full },
+  fwBadgeText: { color: Colors.accentLight, fontWeight: Typography.weight.bold, letterSpacing: 1.2 },
+  fwBlurb: { color: Colors.textSecondary, lineHeight: 20 },
+
+  incomeLabel: { color: Colors.textSecondary, letterSpacing: 1.2, fontWeight: Typography.weight.bold, marginBottom: Spacing['2'] },
+  incomeInput: { backgroundColor: Colors.surfaceAlt, color: Colors.text, borderWidth: 1, borderColor: Colors.border, borderRadius: Radius.lg, paddingHorizontal: Spacing['4'], paddingVertical: Spacing['3'], fontWeight: Typography.weight.bold },
+  incomeHint: { color: Colors.textMuted, marginTop: Spacing['2'] },
 });
