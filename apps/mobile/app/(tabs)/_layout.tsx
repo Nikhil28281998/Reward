@@ -1,6 +1,6 @@
 import React from 'react';
 import { Tabs, Redirect } from 'expo-router';
-import { View, StyleSheet, useWindowDimensions } from 'react-native';
+import { View, Text, StyleSheet, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing } from '../../constants/theme';
 import { moderateScale } from '../../lib/responsive';
@@ -9,12 +9,7 @@ import { useAuthStore } from '../../lib/store';
 function TabIcon({ emoji, focused }: { emoji: string; focused: boolean }) {
   return (
     <View style={[styles.tabIcon, focused && styles.tabIconActive]}>
-      <View style={{ opacity: focused ? 1 : 0.55 }}>
-        {/* Using text emoji as icon for now — replace with @expo/vector-icons in production */}
-        <View style={styles.emojiIcon}>
-          {/* Actual icon rendered by system emoji for speed */}
-        </View>
-      </View>
+      <Text style={[styles.emojiIcon, { opacity: focused ? 1 : 0.55 }]}>{emoji}</Text>
     </View>
   );
 }
@@ -30,6 +25,9 @@ export default function TabsLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
+        // Pause inactive tabs to free memory & avoid offscreen renders
+        freezeOnBlur: true,
+        lazy: true,
         tabBarStyle: {
           backgroundColor: Colors.surface,
           borderTopWidth: 1,
@@ -56,23 +54,21 @@ export default function TabsLayout() {
         options={{ title: 'Cards', tabBarIcon: ({ focused }) => <TabIcon emoji="💳" focused={focused} /> }}
       />
       <Tabs.Screen
+        name="wealth"
+        options={{ title: 'Wealth', tabBarIcon: ({ focused }) => <TabIcon emoji="📈" focused={focused} /> }}
+      />
+      <Tabs.Screen
         name="ledger"
         options={{ title: 'Ledger', tabBarIcon: ({ focused }) => <TabIcon emoji="📊" focused={focused} /> }}
       />
-      <Tabs.Screen
-        name="discover"
-        options={{ title: 'Discover', tabBarIcon: ({ focused }) => <TabIcon emoji="✨" focused={focused} /> }}
-      />
-      <Tabs.Screen
-        name="assistant"
-        options={{ title: 'Ask AI', tabBarIcon: ({ focused }) => <TabIcon emoji="🤖" focused={focused} /> }}
-      />
+      {/* Discover removed from tab bar — now routed from home. Assistant lives at app root as a modal. */}
+      <Tabs.Screen name="discover" options={{ href: null }} />
     </Tabs>
   );
 }
 
 const styles = StyleSheet.create({
-  tabIcon: { width: 28, height: 28, alignItems: 'center', justifyContent: 'center', borderRadius: 8 },
+  tabIcon: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center', borderRadius: 10 },
   tabIconActive: { backgroundColor: Colors.primaryMuted },
-  emojiIcon: { width: 20, height: 20 },
+  emojiIcon: { fontSize: 18, lineHeight: 20, textAlign: 'center' },
 });

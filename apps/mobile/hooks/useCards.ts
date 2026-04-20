@@ -51,3 +51,25 @@ export function useUpdateCard() {
     },
   });
 }
+
+export function useCardCatalog(query?: string) {
+  return useQuery({
+    queryKey: ['cards', 'catalog', query ?? ''],
+    queryFn: async () => {
+      const res = await api.cards.searchProducts(query ? { q: query } : undefined);
+      return res.data.products as import('@reward/shared').CardProduct[];
+    },
+    staleTime: 10 * 60 * 1000,
+  });
+}
+
+export function useCreateCard() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: import('@reward/shared').CreateCardInput) =>
+      api.cards.create(data).then((r) => r.data.card as CardAccount),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['cards'] });
+    },
+  });
+}

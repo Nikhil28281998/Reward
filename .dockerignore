@@ -1,0 +1,14 @@
+.git
+.github
+node_modules
+**/node_modules
+apps/mobile
+apps/api/.env
+.env
+.env.local
+dist
+dist-web
+dist-test
+.expo
+*.log
+.vercel

@@ -4,11 +4,14 @@ import {
   KeyboardAvoidingView, Platform, useWindowDimensions, ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Colors, Typography, Spacing, Radius, Shadow } from '../../constants/theme';
-import { moderateScale, wp } from '../../lib/responsive';
-import { api } from '../../lib/api';
-import { useUIStore } from '../../lib/store';
-import { useCards } from '../../hooks/useCards';
+import { LinearGradient } from 'expo-linear-gradient';
+import { router } from 'expo-router';
+import { Colors, Typography, Spacing, Radius } from '../constants/theme';
+import { moderateScale, wp } from '../lib/responsive';
+import { api } from '../lib/api';
+import { useUIStore } from '../lib/store';
+import { useCards } from '../hooks/useCards';
+import { AIAvatar } from '../components/ui/AIAvatar';
 
 interface Message {
   id: string;
@@ -18,15 +21,15 @@ interface Message {
 }
 
 const SUGGESTION_CHIPS = [
-  'Which card for dining out?',
-  'Best card for travel?',
-  'How to redeem my points?',
-  'Compare my rewards rates',
-  'What's my best signup bonus?',
+  'Best card for dining tonight?',
+  'Which card for $500 at Costco?',
+  'How do I redeem my points for travel?',
+  'Am I missing a signup bonus?',
+  'Compare my reward rates',
 ];
 
 export default function AssistantScreen() {
-  const { width } = useWindowDimensions();
+  useWindowDimensions();
   const insets = useSafeAreaInsets();
   const { cards } = useCards();
   const { assistantThreadId, setAssistantThreadId } = useUIStore();
@@ -36,7 +39,7 @@ export default function AssistantScreen() {
       id: '0',
       role: 'assistant',
       content:
-        "Hi! I'm your Reward AI assistant. Ask me anything about your credit card rewards — which card to use, how to maximize points, or travel redemption strategies.",
+        "Hi — I'm Labhly, your AI rewards strategist.\n\nI can see your wallet, your recent spend, and every card's earn rates. Ask me anything about points, cashback, or travel redemptions.",
       followUps: SUGGESTION_CHIPS.slice(0, 3),
     },
   ]);
@@ -69,22 +72,29 @@ export default function AssistantScreen() {
           cardAccountIds: cardIds,
         });
 
-        if (res.threadId) setAssistantThreadId(res.threadId);
+        const data = (res.data ?? {}) as {
+          answer?: string;
+          threadId?: string;
+          suggestedFollowUps?: string[];
+        };
+        if (data.threadId) setAssistantThreadId(data.threadId);
 
         const assistantMsg: Message = {
           id: (Date.now() + 1).toString(),
           role: 'assistant',
-          content: res.answer,
-          followUps: res.suggestedFollowUps ?? [],
+          content: data.answer ?? 'I could not produce an answer just now. Try rephrasing?',
+          followUps: data.suggestedFollowUps ?? [],
         };
         setMessages((prev) => [...prev, assistantMsg]);
-      } catch {
+      } catch (err) {
         setMessages((prev) => [
           ...prev,
           {
             id: (Date.now() + 1).toString(),
             role: 'assistant',
-            content: "I'm having trouble connecting right now. Please try again in a moment.",
+            content:
+              (err instanceof Error ? err.message : "I'm having trouble connecting right now.") +
+              ' Please try again in a moment.',
           },
         ]);
       } finally {
@@ -100,8 +110,8 @@ export default function AssistantScreen() {
     return (
       <View style={[styles.msgRow, isUser ? styles.msgRowUser : styles.msgRowAssistant]}>
         {!isUser && (
-          <View style={styles.avatar}>
-            <Text style={{ fontSize: 18 }}>🤖</Text>
+          <View style={styles.avatarWrap}>
+            <AIAvatar size="sm" />
           </View>
         )}
         <View
@@ -141,36 +151,50 @@ export default function AssistantScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <Text style={{ fontSize: 26 }}>🤖</Text>
+          <AIAvatar size="md" withGlow />
           <View style={styles.headerTextGroup}>
-            <Text style={[styles.headerTitle, { fontSize: moderateScale(18) }]}>Ask AI</Text>
-            <Text style={[styles.headerSub, { fontSize: moderateScale(12) }]}>
-              Rewards specialist
+            <Text style={[styles.headerTitle, { fontSize: moderateScale(17) }]}>Labhly AI</Text>
+            <Text style={[styles.headerSub, { fontSize: moderateScale(11) }]}>
+              Reading {cards?.length ?? 0} card{cards?.length === 1 ? '' : 's'} · live
             </Text>
           </View>
         </View>
-        {assistantThreadId && (
+        <View style={{ flexDirection: 'row', gap: Spacing['2'], alignItems: 'center' }}>
           <Pressable
             hitSlop={8}
-            onPress={() => {
-              setMessages([{
-                id: '0',
-                role: 'assistant',
-                content: 'Starting a new conversation. How can I help?',
-                followUps: SUGGESTION_CHIPS.slice(0, 3),
-              }]);
-              setAssistantThreadId(null);
-            }}
+            onPress={() => router.push('/best-card')}
+            style={({ pressed }) => [styles.ctaPill, { opacity: pressed ? 0.8 : 1 }]}
           >
-            <Text style={[styles.newThread, { fontSize: moderateScale(13) }]}>New chat</Text>
+            <Text style={[styles.ctaPillText, { fontSize: moderateScale(11) }]}>⚡ Best card</Text>
           </Pressable>
-        )}
+          {assistantThreadId && (
+            <Pressable
+              hitSlop={8}
+              onPress={() => {
+                setMessages([{
+                  id: '0',
+                  role: 'assistant',
+                  content: 'Starting a new conversation. What would you like to optimize today?',
+                  followUps: SUGGESTION_CHIPS.slice(0, 3),
+                }]);
+                setAssistantThreadId(null);
+              }}
+            >
+              <Text style={[styles.newThread, { fontSize: moderateScale(12) }]}>New</Text>
+            </Pressable>
+          )}
+          <Pressable
+            hitSlop={8}
+            onPress={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)'))}
+            style={({ pressed }) => [styles.closeBtn, { opacity: pressed ? 0.75 : 1 }]}
+          >
+            <Text style={styles.closeBtnText}>✕</Text>
+          </Pressable>
+        </View>
       </View>
 
-      {/* Suggestion chips (only shown when first message) */}
       {messages.length === 1 && (
         <View style={styles.chips}>
           {SUGGESTION_CHIPS.map((chip, i) => (
@@ -201,24 +225,21 @@ export default function AssistantScreen() {
           ListFooterComponent={
             isLoading ? (
               <View style={styles.typingIndicator}>
-                <View style={styles.avatar}>
-                  <Text style={{ fontSize: 18 }}>🤖</Text>
-                </View>
+                <AIAvatar size="sm" />
                 <View style={[styles.bubble, styles.bubbleAssistant, { paddingVertical: Spacing['3'] }]}>
-                  <ActivityIndicator size="small" color={Colors.textMuted} />
+                  <ActivityIndicator size="small" color={Colors.primaryLight} />
                 </View>
               </View>
             ) : null
           }
         />
 
-        {/* Input bar */}
         <View style={[styles.inputBar, { paddingBottom: insets.bottom > 0 ? insets.bottom : Spacing['3'] }]}>
           <TextInput
             style={[styles.input, { fontSize: moderateScale(15), flex: 1 }]}
             value={inputText}
             onChangeText={setInputText}
-            placeholder="Ask about your rewards…"
+            placeholder="Ask about your wallet…"
             placeholderTextColor={Colors.textMuted}
             multiline
             maxLength={1000}
@@ -233,12 +254,17 @@ export default function AssistantScreen() {
             onPress={() => void sendMessage(inputText)}
             disabled={!inputText.trim() || isLoading}
           >
-            <Text style={[styles.sendIcon, { fontSize: moderateScale(20) }]}>⬆</Text>
+            <LinearGradient
+              colors={['#4F46E5', '#7C3AED']}
+              start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+              style={StyleSheet.absoluteFill}
+            />
+            <Text style={[styles.sendIcon, { fontSize: moderateScale(18) }]}>↑</Text>
           </Pressable>
         </View>
 
         <Text style={[styles.disclaimer, { fontSize: moderateScale(10) }]}>
-          AI for rewards guidance only. Not financial or investment advice.
+          AI rewards guidance only. Not financial or investment advice.
         </Text>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -250,18 +276,22 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing['4'], paddingVertical: Spacing['3'], borderBottomWidth: 1, borderBottomColor: Colors.border },
   headerLeft: { flexDirection: 'row', alignItems: 'center', gap: Spacing['3'] },
   headerTextGroup: {},
-  headerTitle: { color: Colors.text, fontWeight: Typography.weight.bold },
-  headerSub: { color: Colors.textMuted },
-  newThread: { color: Colors.primary },
+  headerTitle: { color: Colors.text, fontWeight: Typography.weight.bold, letterSpacing: -0.2 },
+  headerSub: { color: Colors.accentLight, marginTop: 1, fontWeight: Typography.weight.medium },
+  ctaPill: { backgroundColor: Colors.primaryMuted, borderRadius: Radius.full, paddingHorizontal: Spacing['3'], paddingVertical: Spacing['2'], borderWidth: 1, borderColor: 'rgba(129,140,248,0.35)' },
+  ctaPillText: { color: Colors.primaryLight, fontWeight: Typography.weight.semibold },
+  newThread: { color: Colors.textMuted, paddingHorizontal: Spacing['2'], paddingVertical: Spacing['2'] },
+  closeBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.surface, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: Colors.border },
+  closeBtnText: { color: Colors.text, fontSize: 16, lineHeight: 16, fontWeight: '700' },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing['2'], paddingHorizontal: Spacing['4'], paddingVertical: Spacing['3'] },
   chip: { backgroundColor: Colors.surface, borderRadius: Radius.full, paddingHorizontal: Spacing['3'], paddingVertical: Spacing['2'], borderWidth: 1, borderColor: Colors.border },
   chipText: { color: Colors.textSecondary },
   kav: { flex: 1 },
-  messageList: { padding: Spacing['4'], gap: Spacing['4'], paddingBottom: Spacing['4'] },
+  messageList: { padding: Spacing['4'], gap: Spacing['4'], paddingBottom: Spacing['6'] },
   msgRow: { flexDirection: 'row', gap: Spacing['2'] },
   msgRowUser: { justifyContent: 'flex-end' },
   msgRowAssistant: { justifyContent: 'flex-start' },
-  avatar: { width: 32, height: 32, backgroundColor: Colors.surface, borderRadius: 16, alignItems: 'center', justifyContent: 'center', alignSelf: 'flex-end', borderWidth: 1, borderColor: Colors.border },
+  avatarWrap: { alignSelf: 'flex-end' },
   bubble: { borderRadius: Radius['2xl'], padding: Spacing['4'] },
   bubbleUser: { backgroundColor: Colors.primary, borderBottomRightRadius: 4 },
   bubbleAssistant: { backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border, borderBottomLeftRadius: 4 },
@@ -274,7 +304,7 @@ const styles = StyleSheet.create({
   typingIndicator: { flexDirection: 'row', gap: Spacing['2'], alignItems: 'center' },
   inputBar: { flexDirection: 'row', alignItems: 'flex-end', gap: Spacing['3'], paddingHorizontal: Spacing['4'], paddingTop: Spacing['3'], borderTopWidth: 1, borderTopColor: Colors.border, backgroundColor: Colors.background },
   input: { backgroundColor: Colors.surface, borderRadius: Radius.xl, paddingHorizontal: Spacing['4'], paddingVertical: Spacing['3'], color: Colors.text, borderWidth: 1, borderColor: Colors.border, minHeight: 44, maxHeight: 120 },
-  sendBtn: { width: 44, height: 44, backgroundColor: Colors.primary, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
-  sendIcon: { color: Colors.white },
+  sendBtn: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  sendIcon: { color: Colors.white, fontWeight: Typography.weight.bold },
   disclaimer: { textAlign: 'center', color: Colors.textMuted, paddingVertical: Spacing['2'], paddingHorizontal: Spacing['4'] },
 });

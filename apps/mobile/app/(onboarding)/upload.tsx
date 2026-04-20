@@ -77,23 +77,45 @@ export default function UploadScreen() {
   };
 
   const options: UploadOption[] = [
-    { icon: '📷', label: 'Scan with camera', sublabel: 'Point at any statement page', action: openCamera },
-    { icon: '🖼️', label: 'Choose screenshot', sublabel: 'Import from your photo library', action: openGallery },
-    { icon: '📄', label: 'Upload PDF', sublabel: 'Import your e-statement PDF', action: openDocument },
+    { icon: '📷', label: 'Scan with camera', sublabel: 'Statement, receipt or offer flyer', action: openCamera },
+    { icon: '🖼️', label: 'Pick screenshot', sublabel: 'Card-offer screenshots from your bank app', action: openGallery },
+    { icon: '📄', label: 'Upload PDF', sublabel: 'Statements & e-bills', action: openDocument },
   ];
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+      {/* Top bar with back + close */}
+      <View style={styles.topBar}>
+        <Pressable
+          style={({ pressed }) => [styles.iconBtn, { opacity: pressed ? 0.6 : 1 }]}
+          onPress={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)'))}
+          hitSlop={10}
+          accessibilityLabel="Back"
+        >
+          <Text style={styles.iconBtnText}>‹</Text>
+        </Pressable>
+        <Text style={[styles.topBarTitle, { fontSize: moderateScale(14) }]}>Import documents</Text>
+        <Pressable
+          style={({ pressed }) => [styles.iconBtn, { opacity: pressed ? 0.6 : 1 }]}
+          onPress={() => router.replace('/(tabs)')}
+          hitSlop={10}
+          accessibilityLabel="Close"
+        >
+          <Text style={[styles.iconBtnText, { fontSize: 20 }]}>✕</Text>
+        </Pressable>
+      </View>
+
       {/* Progress bar */}
       <View style={styles.progressBar}>
         <View style={[styles.progressFill, { width: '33%' }]} />
       </View>
 
       <View style={styles.content}>
-        <Text style={[styles.step, { fontSize: moderateScale(13) }]}>Step 1 of 3</Text>
-        <Text style={[styles.title, { fontSize: moderateScale(28) }]}>Add your first card</Text>
-        <Text style={[styles.subtitle, { fontSize: moderateScale(15) }]}>
-          Upload a recent statement — we&apos;ll detect your card and import transactions automatically.
+        <Text style={[styles.step, { fontSize: moderateScale(13) }]}>Statements · offers · receipts</Text>
+        <Text style={[styles.title, { fontSize: moderateScale(26) }]}>Import documents</Text>
+        <Text style={[styles.subtitle, { fontSize: moderateScale(14) }]}>
+          Snap or upload a statement PDF, a card-offer screenshot from your bank app, or a receipt —
+          Labhly reads it, categorizes the transactions, and files them into the right section.
         </Text>
 
         {/* Upload illustration */}
@@ -116,7 +138,7 @@ export default function UploadScreen() {
               <View style={styles.illustrationContent}>
                 <Text style={{ fontSize: 52 }}>📋</Text>
                 <Text style={[styles.illustrationText, { fontSize: moderateScale(14) }]}>
-                  Your statement goes here
+                  Statements · offers · receipts
                 </Text>
                 <View style={styles.illustrationBadge}>
                   <Text style={[styles.badgeText, { fontSize: moderateScale(11) }]}>
@@ -152,8 +174,8 @@ export default function UploadScreen() {
 
         {/* Skip */}
         {!uploading && (
-          <Pressable style={styles.skipBtn} onPress={() => router.push('/(onboarding)/income')}>
-            <Text style={[styles.skipText, { fontSize: moderateScale(14) }]}>Skip for now</Text>
+          <Pressable style={styles.skipBtn} onPress={() => router.replace('/(tabs)')}>
+            <Text style={[styles.skipText, { fontSize: moderateScale(14) }]}>Cancel</Text>
           </Pressable>
         )}
       </View>
@@ -163,6 +185,10 @@ export default function UploadScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
+  topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing['4'], paddingVertical: Spacing['2'] },
+  iconBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: Colors.surface, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: Colors.border },
+  iconBtnText: { color: Colors.text, fontSize: 22, fontWeight: Typography.weight.bold, marginTop: -2 },
+  topBarTitle: { color: Colors.textSecondary, fontWeight: Typography.weight.semibold, letterSpacing: 0.2 },
   progressBar: { height: 3, backgroundColor: Colors.surfaceAlt, marginTop: 0 },
   progressFill: { height: 3, backgroundColor: Colors.primary, borderRadius: Radius.full },
   content: { flex: 1, paddingHorizontal: Spacing['6'], paddingTop: Spacing['6'], alignItems: 'center' },

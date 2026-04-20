@@ -1,20 +1,20 @@
 {
   "expo": {
-    "name": "Reward",
-    "slug": "reward",
+    "name": "Labhly",
+    "slug": "labhly",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
     "splash": {
-      "image": "./assets/splash.png",
       "resizeMode": "contain",
       "backgroundColor": "#09090B"
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.reward.app",
+      "bundleIdentifier": "com.labhly.app",
       "buildNumber": "1",
       "infoPlist": {
         "NSCameraUsageDescription": "Capture credit card statements with your camera",
@@ -24,20 +24,19 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#09090B"
       },
-      "package": "com.reward.app",
+      "package": "com.labhly.app",
       "versionCode": 1,
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.READ_EXTERNAL_STORAGE",
         "android.permission.USE_BIOMETRIC",
-        "android.permission.USE_FINGERPRINT"
+        "android.permission.USE_FINGERPRINT",
+        "android.permission.RECORD_AUDIO"
       ]
     },
     "web": {
-      "favicon": "./assets/favicon.png",
       "bundler": "metro"
     },
     "plugins": [
@@ -46,24 +45,28 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Allow Reward to access your camera to capture credit card statements."
+          "cameraPermission": "Allow Labhly to access your camera to capture credit card statements."
         }
       ],
       [
         "expo-image-picker",
         {
-          "photosPermission": "Allow Reward to access your photos to import statement screenshots."
+          "photosPermission": "Allow Labhly to access your photos to import statement screenshots."
         }
       ]
     ],
     "experiments": {
       "typedRoutes": true
     },
-    "scheme": "reward",
+    "scheme": "labhly",
     "extra": {
+      "router": {
+        "origin": false
+      },
       "eas": {
-        "projectId": "YOUR_EAS_PROJECT_ID"
+        "projectId": "0d44eda5-7103-4867-9da9-19719c2c73aa"
       }
-    }
+    },
+    "owner": "nikhil2828"
   }
 }

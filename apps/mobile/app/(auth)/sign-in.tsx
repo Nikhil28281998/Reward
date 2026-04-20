@@ -47,7 +47,7 @@ export default function SignInScreen() {
 
           <Text style={[styles.title, { fontSize: moderateScale(30) }]}>Welcome back</Text>
           <Text style={[styles.subtitle, { fontSize: moderateScale(15) }]}>
-            Sign in to your Reward account
+            Sign in to your Labhly account
           </Text>
 
           {/* Form */}

@@ -1,10 +1,10 @@
 import axios, { type AxiosInstance, type AxiosError } from 'axios';
-import * as SecureStore from 'expo-secure-store';
+import { storage } from './platform';
 
 // ─── API Client ───────────────────────────────────────────────────────────────
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3000';
-const TOKEN_KEY = 'reward_auth_token';
+const TOKEN_KEY = 'labhly_auth_token';
 
 let _api: AxiosInstance | null = null;
 
@@ -22,7 +22,7 @@ export function getApiClient(): AxiosInstance {
 
   // ── Request: inject JWT
   _api.interceptors.request.use(async (cfg) => {
-    const token = await SecureStore.getItemAsync(TOKEN_KEY);
+    const token = await getStoredToken();
     if (token) {
       cfg.headers.Authorization = `Bearer ${token}`;
     }
@@ -41,18 +41,18 @@ export function getApiClient(): AxiosInstance {
   return _api;
 }
 
-// ─── Token helpers ────────────────────────────────────────────────────────────
+// ─── Token helpers (delegate to platform.storage) ─────────────────────────────
 
 export async function storeToken(token: string): Promise<void> {
-  await SecureStore.setItemAsync(TOKEN_KEY, token);
+  await storage.set(TOKEN_KEY, token);
 }
 
 export async function clearToken(): Promise<void> {
-  await SecureStore.deleteItemAsync(TOKEN_KEY);
+  await storage.remove(TOKEN_KEY);
 }
 
 export async function getStoredToken(): Promise<string | null> {
-  return SecureStore.getItemAsync(TOKEN_KEY);
+  return storage.get(TOKEN_KEY);
 }
 
 // ─── Typed endpoint helpers ───────────────────────────────────────────────────
@@ -78,10 +78,11 @@ export const api = {
     list: () => getApiClient().get('/v1/cards'),
     summary: () => getApiClient().get('/v1/cards/summary'),
     get: (id: string) => getApiClient().get(`/v1/cards/${id}`),
+    create: (data: unknown) => getApiClient().post('/v1/cards', data),
     update: (id: string, data: unknown) => getApiClient().patch(`/v1/cards/${id}`, data),
     remove: (id: string) => getApiClient().delete(`/v1/cards/${id}`),
-    searchProducts: (params: Record<string, string>) =>
-      getApiClient().get('/v1/cards/products/search', { params }),
+    searchProducts: (params?: Record<string, string>) =>
+      getApiClient().get('/v1/cards/products/search', { params: params ?? {} }),
   },
   ledger: {
     list: (params?: Record<string, unknown>) => getApiClient().get('/v1/ledger', { params }),

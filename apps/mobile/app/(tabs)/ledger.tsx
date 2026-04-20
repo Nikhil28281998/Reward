@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import {
   View, Text, StyleSheet, Pressable, SectionList,
-  TextInput, useWindowDimensions,
+  TextInput, useWindowDimensions, Modal, ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors, Typography, Spacing, Radius } from '../../constants/theme';
@@ -10,7 +10,7 @@ import { usePaginatedLedger, useSpendSummary } from '../../hooks/useLedger';
 import { TransactionRow } from '../../components/ui/TransactionRow';
 import { LoadingPulse } from '../../components/ui/LoadingPulse';
 import { EmptyState } from '../../components/ui/EmptyState';
-import { CATEGORIES } from '@reward/shared';
+import { CATEGORIES, CATEGORY_ORDER } from '@reward/shared';
 import type { Transaction } from '@reward/shared';
 import { monthKey, monthLabel, formatUSD } from '@reward/shared';
 
@@ -27,12 +27,14 @@ function groupByDate(transactions: Transaction[]): Array<{ title: string; data: 
   }));
 }
 
-const FILTER_CATS = ['all', 'dining', 'travel', 'groceries', 'gas', 'streaming', 'other'] as const;
+const FILTER_CATS: readonly string[] = ['all', ...CATEGORY_ORDER];
 
 export default function LedgerScreen() {
   const { width } = useWindowDimensions();
   const [search, setSearch] = useState('');
   const [filterCat, setFilterCat] = useState<string>('all');
+  const [selectedMonth, setSelectedMonth] = useState<string>('all');
+  const [showMonthPicker, setShowMonthPicker] = useState(false);
 
   const { data, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } = usePaginatedLedger();
   const { spendSummary } = useSpendSummary();
@@ -42,8 +44,23 @@ export default function LedgerScreen() {
     [data],
   );
 
+  const availableMonths = useMemo(() => {
+    const set = new Set<string>();
+    // Always include last 12 months so filter is useful even on new accounts.
+    const now = new Date();
+    for (let i = 0; i < 12; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      set.add(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+    }
+    for (const tx of allTransactions) set.add(monthKey(tx.date));
+    return Array.from(set).sort().reverse();
+  }, [allTransactions]);
+
   const filtered = useMemo(() => {
     let txs = allTransactions;
+    if (selectedMonth !== 'all') {
+      txs = txs.filter((t) => monthKey(t.date) === selectedMonth);
+    }
     if (search.trim()) {
       const q = search.toLowerCase();
       txs = txs.filter(
@@ -56,24 +73,69 @@ export default function LedgerScreen() {
       txs = txs.filter((t) => t.category === filterCat);
     }
     return txs;
-  }, [allTransactions, search, filterCat]);
+  }, [allTransactions, search, filterCat, selectedMonth]);
 
   const sections = useMemo(() => groupByDate(filtered), [filtered]);
+
+  const monthDisplay = selectedMonth === 'all' ? 'All time' : monthLabel(selectedMonth);
+  const monthTotal = filtered.filter((t) => !t.isCredit).reduce((s, t) => s + Number(t.amount), 0);
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={[styles.title, { fontSize: moderateScale(26) }]}>Ledger</Text>
-        {spendSummary && (
-          <View style={styles.totalBadge}>
-            <Text style={[styles.totalLabel, { fontSize: moderateScale(11) }]}>This month</Text>
-            <Text style={[styles.totalValue, { fontSize: moderateScale(15) }]}>
-              {formatUSD(spendSummary.totalSpend)}
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.title, { fontSize: moderateScale(26) }]}>Ledger</Text>
+          <Pressable
+            style={styles.monthPill}
+            onPress={() => setShowMonthPicker(true)}
+            hitSlop={6}
+          >
+            <Text style={[styles.monthPillText, { fontSize: moderateScale(12) }]}>
+              📅 {monthDisplay} ▾
             </Text>
-          </View>
-        )}
+          </Pressable>
+        </View>
+        <View style={styles.totalBadge}>
+          <Text style={[styles.totalLabel, { fontSize: moderateScale(11) }]}>Spent</Text>
+          <Text style={[styles.totalValue, { fontSize: moderateScale(15) }]}>
+            {formatUSD(monthTotal)}
+          </Text>
+        </View>
       </View>
+
+      {/* Month picker modal */}
+      <Modal
+        visible={showMonthPicker}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowMonthPicker(false)}
+      >
+        <Pressable style={styles.monthBackdrop} onPress={() => setShowMonthPicker(false)}>
+          <Pressable style={styles.monthSheet} onPress={(e) => e.stopPropagation()}>
+            <Text style={styles.monthSheetTitle}>Filter by month</Text>
+            <ScrollView style={{ maxHeight: 360 }}>
+              <Pressable
+                style={[styles.monthOpt, selectedMonth === 'all' && styles.monthOptActive]}
+                onPress={() => { setSelectedMonth('all'); setShowMonthPicker(false); }}
+              >
+                <Text style={[styles.monthOptText, selectedMonth === 'all' && styles.monthOptTextActive]}>All time</Text>
+              </Pressable>
+              {availableMonths.map((m) => (
+                <Pressable
+                  key={m}
+                  style={[styles.monthOpt, selectedMonth === m && styles.monthOptActive]}
+                  onPress={() => { setSelectedMonth(m); setShowMonthPicker(false); }}
+                >
+                  <Text style={[styles.monthOptText, selectedMonth === m && styles.monthOptTextActive]}>
+                    {monthLabel(m)}
+                  </Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       {/* Search bar */}
       <View style={[styles.searchBar, { width: wp(90), alignSelf: 'center' }]}>
@@ -90,7 +152,11 @@ export default function LedgerScreen() {
       </View>
 
       {/* Category filters */}
-      <View style={styles.filterRow}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.filterRow}
+      >
         {FILTER_CATS.map((cat) => {
           const meta = cat !== 'all' ? CATEGORIES[cat as keyof typeof CATEGORIES] : null;
           return (
@@ -109,7 +175,7 @@ export default function LedgerScreen() {
             </Pressable>
           );
         })}
-      </View>
+      </ScrollView>
 
       {/* Transaction list */}
       {isLoading ? (
@@ -154,6 +220,15 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing['4'], paddingVertical: Spacing['4'] },
   title: { color: Colors.text, fontWeight: Typography.weight.bold, letterSpacing: -0.5 },
+  monthPill: { alignSelf: 'flex-start', backgroundColor: Colors.primaryMuted, borderRadius: Radius.full, paddingHorizontal: Spacing['3'], paddingVertical: 6, marginTop: 4, borderWidth: 1, borderColor: 'rgba(129,140,248,0.35)' },
+  monthPillText: { color: Colors.primaryLight, fontWeight: '700' },
+  monthBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center', padding: Spacing['5'] },
+  monthSheet: { backgroundColor: Colors.surface, borderRadius: Radius['2xl'], padding: Spacing['4'], width: '100%', maxWidth: 400, borderWidth: 1, borderColor: Colors.border },
+  monthSheetTitle: { color: Colors.text, fontWeight: '700', fontSize: 15, marginBottom: Spacing['3'] },
+  monthOpt: { paddingVertical: Spacing['3'], paddingHorizontal: Spacing['3'], borderRadius: Radius.lg },
+  monthOptActive: { backgroundColor: Colors.primaryMuted },
+  monthOptText: { color: Colors.textSecondary, fontSize: 14, fontWeight: '600' },
+  monthOptTextActive: { color: Colors.primaryLight, fontWeight: '700' },
   totalBadge: { backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: Spacing['3'], alignItems: 'flex-end', borderWidth: 1, borderColor: Colors.border },
   totalLabel: { color: Colors.textMuted, fontWeight: Typography.weight.bold, textTransform: 'uppercase', letterSpacing: 0.5 },
   totalValue: { color: Colors.text, fontWeight: Typography.weight.bold, marginTop: 1 },

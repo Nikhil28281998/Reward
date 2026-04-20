@@ -11,9 +11,12 @@ Thumbs.db
 # Node and package managers
 node_modules/
 dist/
+dist-web/
 build/
 .turbo/
 .next/
+.expo/
+.expo-shared/
 coverage/
 *.tsbuildinfo
 npm-debug.log*

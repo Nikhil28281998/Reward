@@ -1,0 +1,74 @@
+# Render.com Infrastructure-as-Code
+# Creates: Web service (API), Worker service, Postgres, Redis
+databases:
+  - name: reward-db
+    plan: free
+    databaseName: reward
+    user: reward
+    postgresMajorVersion: 16
+
+services:
+  # Redis (BullMQ + rate limit)
+  - type: redis
+    name: reward-redis
+    plan: free
+    ipAllowList: []
+    maxmemoryPolicy: noeviction
+
+  # Fastify API
+  - type: web
+    name: reward-api
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3001
+      - key: DATABASE_URL
+        fromDatabase:
+          name: reward-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: reward-redis
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_BASE_URL
+        sync: false
+      - key: OPENAI_MODEL
+        sync: false
+
+  # BullMQ OCR worker
+  - type: worker
+    name: reward-worker
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    dockerCommand: pnpm exec tsx src/workers/ocr.worker.ts
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: reward-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: reward-redis
+          property: connectionString
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_BASE_URL
+        sync: false
+      - key: OPENAI_MODEL
+        sync: false

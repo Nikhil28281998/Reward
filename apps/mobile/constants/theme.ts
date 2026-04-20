@@ -1,16 +1,15 @@
 import { Platform } from 'react-native';
 
-// ─── Color Palette (dark-first, inspired by best competitors) ─────────────────
-// MaxRewards: clean dark card surface
-// Copilot: premium zinc/slate dark mode
-// Monarch: vibrant accent on dark background
+// ─── Color Palette (dark-first, Labhly Indigo) ────────────────────────────────
+// Brand: Labhly (Sanskrit "labha" = gain/profit/reward)
+// Indigo primary differentiates from MaxRewards (purple), Kudos (orange), CardPointers (blue)
 
 export const Colors = {
-  // ── Brand
-  primary: '#7C3AED',       // Violet 600 — main CTA
-  primaryLight: '#A78BFA',  // Violet 400
-  primaryDark: '#5B21B6',   // Violet 800
-  primaryMuted: '#2D1B69',  // Violet 950 — for subtle tints
+  // ── Brand (Labhly Indigo)
+  primary: '#4F46E5',       // Indigo 600 — main CTA
+  primaryLight: '#818CF8',  // Indigo 400
+  primaryDark: '#3730A3',   // Indigo 800
+  primaryMuted: '#1E1B4B',  // Indigo 950 — for subtle tints
 
   // ── Accent / Rewards
   accent: '#10B981',        // Emerald 500 — positive, rewards, gains
@@ -56,7 +55,7 @@ export const Colors = {
     capitalOne: ['#B45309', '#D97706'] as [string, string],
     discover: ['#D97706', '#F59E0B'] as [string, string],
     boa: ['#1E3A8A', '#1D4ED8'] as [string, string],
-    default: ['#5B21B6', '#7C3AED'] as [string, string],
+    default: ['#3730A3', '#4F46E5'] as [string, string],
   },
 } as const;
 

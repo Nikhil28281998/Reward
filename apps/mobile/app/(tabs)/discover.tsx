@@ -10,6 +10,7 @@ import { moderateScale, wp } from '../../lib/responsive';
 import { useRecommendations, useOffers } from '../../hooks/useRecommendations';
 import { LoadingPulse } from '../../components/ui/LoadingPulse';
 import { EmptyState } from '../../components/ui/EmptyState';
+import { titleCase, formatUSDCompact } from '../../lib/format';
 import type { CardRecommendation, Offer } from '@reward/shared';
 
 const TABS = ['Cards', 'Offers'] as const;
@@ -60,10 +61,23 @@ function RecommendationCard({ rec }: { rec: CardRecommendation }) {
 
         <View style={styles.valueRow}>
           <Text style={[styles.valueLabel, { fontSize: moderateScale(12) }]}>Est. annual value</Text>
-          <Text style={[styles.valueAmount, { fontSize: moderateScale(15) }]}>
-            ${rec.estimatedAnnualValue.toLocaleString()}
+          <Text
+            style={[
+              styles.valueAmount,
+              { fontSize: moderateScale(15) },
+              rec.estimatedAnnualValue < 0 && { color: Colors.dangerLight },
+            ]}
+          >
+            {rec.estimatedAnnualValue < 0
+              ? `–${formatUSDCompact(Math.abs(rec.estimatedAnnualValue))}/yr`
+              : `${formatUSDCompact(rec.estimatedAnnualValue)}/yr`}
           </Text>
         </View>
+        {rec.estimatedAnnualValue < 0 ? (
+          <View style={styles.warnBadge}>
+            <Text style={styles.warnBadgeText}>⚠ Fee likely exceeds value for your spend</Text>
+          </View>
+        ) : null}
 
         {/* Reasoning bullets */}
         <View style={styles.reasoning}>
@@ -98,10 +112,15 @@ function RecommendationCard({ rec }: { rec: CardRecommendation }) {
 }
 
 function OfferItem({ offer }: { offer: Offer }) {
+  const clickable = !!offer.activationUrl;
   return (
     <Pressable
-      style={({ pressed }) => [styles.offerCard, { opacity: pressed ? 0.88 : 1, width: wp(90) }]}
-      onPress={() => offer.activationUrl && void Linking.openURL(offer.activationUrl)}
+      style={({ pressed }) => [
+        styles.offerCard,
+        { opacity: pressed && clickable ? 0.88 : 1, width: wp(90) },
+      ]}
+      onPress={clickable ? () => void Linking.openURL(offer.activationUrl!) : undefined}
+      disabled={!clickable}
     >
       <View style={styles.offerLeft}>
         <View style={styles.offerEmoji}>
@@ -112,7 +131,7 @@ function OfferItem({ offer }: { offer: Offer }) {
             {offer.merchantName}
           </Text>
           <Text style={[styles.offerCategory, { fontSize: moderateScale(12) }]}>
-            {offer.merchantCategory}
+            {titleCase(offer.merchantCategory)}
           </Text>
         </View>
       </View>
@@ -238,6 +257,15 @@ const styles = StyleSheet.create({
   reasoning: { gap: 3 },
   reasonBullet: { color: Colors.textSecondary, lineHeight: 18 },
   annualFee: { color: Colors.textMuted },
+  warnBadge: {
+    marginTop: 8,
+    backgroundColor: Colors.warningMuted,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: Radius.md,
+    alignSelf: 'flex-start',
+  },
+  warnBadgeText: { color: Colors.warningLight, fontSize: 11, fontWeight: '600' },
   sponsored: { color: Colors.textMuted, fontStyle: 'italic' },
   applyBtn: { backgroundColor: Colors.primary, borderRadius: Radius.lg, paddingVertical: Spacing['3'], alignItems: 'center', marginTop: Spacing['2'] },
   applyBtnText: { color: Colors.white, fontWeight: Typography.weight.bold },

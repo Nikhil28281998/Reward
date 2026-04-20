@@ -42,7 +42,7 @@ async function buildApp() {
   // ── Plugins
   await app.register(cors, {
     origin: config.NODE_ENV === 'production'
-      ? ['https://reward.app'] // replace with your production domain
+      ? ['https://labhly.com', 'https://www.labhly.com', 'https://labhly.app']
       : true,
     credentials: true,
   });
@@ -92,7 +92,7 @@ async function main() {
 
   try {
     await app.listen({ port: config.PORT, host: config.HOST });
-    console.log(`🚀 Reward API running on http://${config.HOST}:${config.PORT}`);
+    console.log(`🚀 Labhly API running on http://${config.HOST}:${config.PORT}`);
   } catch (err) {
     app.log.error(err);
     process.exit(1);

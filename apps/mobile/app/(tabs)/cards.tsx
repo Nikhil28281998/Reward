@@ -115,13 +115,22 @@ export default function CardsScreen() {
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
         <Text style={[styles.title, { fontSize: moderateScale(26) }]}>My Cards</Text>
-        <Pressable
-          style={styles.addBtn}
-          onPress={() => router.push('/(onboarding)/upload')}
-          hitSlop={8}
-        >
-          <Text style={[styles.addBtnText, { fontSize: moderateScale(14) }]}>＋ Add card</Text>
-        </Pressable>
+        <View style={{ flexDirection: 'row', gap: Spacing['2'] }}>
+          <Pressable
+            style={styles.scanBtn}
+            onPress={() => router.push('/cards/scan')}
+            hitSlop={8}
+          >
+            <Text style={[styles.scanBtnText, { fontSize: moderateScale(13) }]}>📷 Scan card</Text>
+          </Pressable>
+          <Pressable
+            style={styles.addBtn}
+            onPress={() => router.push('/add')}
+            hitSlop={8}
+          >
+            <Text style={[styles.addBtnText, { fontSize: moderateScale(14) }]}>＋ Add</Text>
+          </Pressable>
+        </View>
       </View>
 
       {isLoading ? (
@@ -130,9 +139,9 @@ export default function CardsScreen() {
         <EmptyState
           emoji="💳"
           title="No cards yet"
-          body="Scan your first statement to get started"
-          cta="Add card"
-          onCta={() => router.push('/(onboarding)/upload')}
+          body="Pick from our catalog of top US rewards cards or scan a recent statement."
+          cta="Browse catalog"
+          onCta={() => router.push('/cards/add')}
         />
       ) : (
         <FlatList
@@ -153,8 +162,10 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing['4'], paddingVertical: Spacing['4'] },
   title: { color: Colors.text, fontWeight: Typography.weight.bold, letterSpacing: -0.5 },
-  addBtn: { backgroundColor: Colors.primaryMuted, borderRadius: Radius.full, paddingHorizontal: Spacing['4'], paddingVertical: Spacing['2'] },
-  addBtnText: { color: Colors.primaryLight, fontWeight: Typography.weight.semibold },
+  addBtn: { backgroundColor: Colors.primary, borderRadius: Radius.full, paddingHorizontal: Spacing['4'], paddingVertical: Spacing['2'] },
+  addBtnText: { color: Colors.white, fontWeight: Typography.weight.semibold },
+  scanBtn: { backgroundColor: Colors.surface, borderRadius: Radius.full, paddingHorizontal: Spacing['3'], paddingVertical: Spacing['2'], borderWidth: 1, borderColor: Colors.border },
+  scanBtnText: { color: Colors.textSecondary, fontWeight: Typography.weight.semibold },
   list: { gap: Spacing['4'], paddingHorizontal: wp(5), paddingBottom: Spacing['20'] },
   cardItem: { backgroundColor: Colors.surface, borderRadius: Radius['2xl'], overflow: 'hidden', borderWidth: 1, borderColor: Colors.border, ...Shadow.md },
   cardVisual: { height: 90, padding: Spacing['4'] },

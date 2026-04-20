@@ -14,11 +14,12 @@ const EnvSchema = z.object({
   JWT_SECRET: z.string().min(32),
   JWT_EXPIRY: z.string().default('30d'),
 
-  OPENAI_API_KEY: z.string().startsWith('sk-'),
+  OPENAI_API_KEY: z.string().min(10),
+  OPENAI_BASE_URL: z.string().url().optional(),
   OPENAI_MODEL: z.string().default('gpt-4o-mini'),
 
   // Object storage (S3-compatible)
-  STORAGE_BUCKET: z.string().default('reward-statements'),
+  STORAGE_BUCKET: z.string().default('labhly-statements'),
   STORAGE_ENDPOINT: z.string().url().optional(),
   STORAGE_ACCESS_KEY: z.string().optional(),
   STORAGE_SECRET_KEY: z.string().optional(),

@@ -2,14 +2,19 @@ import OpenAI from 'openai';
 import type { CardAccount, CardProduct } from '@prisma/client';
 import type { TravelQueryInput } from '@reward/shared';
 import { config } from '../config.js';
+import { prisma } from '../db/client.js';
 
 type CardWithProduct = CardAccount & { cardProduct: CardProduct };
 
-const openai = new OpenAI({ apiKey: config.OPENAI_API_KEY });
+const openai = new OpenAI({
+  apiKey: config.OPENAI_API_KEY,
+  ...(config.OPENAI_BASE_URL ? { baseURL: config.OPENAI_BASE_URL } : {}),
+});
 
 // ─── System Prompt ─────────────────────────────────────────────────────────────
 
-const SYSTEM_PROMPT = `You are Reward Assistant — a concise, expert credit card rewards advisor.
+const SYSTEM_PROMPT = `You are Labhly — a concise, expert credit card rewards advisor.
+Labhly (from Sanskrit "labha" — gain, profit) helps users squeeze every point and cashback dollar from their wallet.
 
 RULES (never break):
 1. You ONLY advise on credit card rewards optimization, points, miles, and travel.
@@ -30,21 +35,53 @@ class AiService {
     threadId: string | undefined;
     cards: CardWithProduct[];
   }) {
+    // ── Build rich user context: cards + category rates + recent spend
     const cardContext = params.cards
-      .map(
-        (c) =>
-          `• ${c.cardProduct.fullName} (last4: ${c.last4 ?? '??'}) | ` +
-          `Rewards: ${c.cardProduct.rewardCurrency} | ` +
-          `Balance: $${Number(c.currentBalance).toFixed(2)} | ` +
-          `Points: ${c.rewardBalance.toLocaleString()}`,
-      )
+      .map((c) => {
+        const rates = (c.cardProduct.categoryRates ?? []) as Array<{ category: string; multiplier: number }>;
+        const topRates = rates
+          .slice()
+          .sort((a, b) => Number(b.multiplier) - Number(a.multiplier))
+          .slice(0, 4)
+          .map((r) => `${r.category} ${r.multiplier}x`)
+          .join(', ');
+        return (
+          `• ${c.cardProduct.fullName} (•••${c.last4 ?? '????'}) — ` +
+          `${c.cardProduct.rewardCurrency} · ${c.rewardBalance.toLocaleString()} pts · ` +
+          `balance $${Number(c.currentBalance).toFixed(2)} · best: ${topRates || 'flat 1x'}`
+        );
+      })
       .join('\n');
 
-    const userContext = `User's cards:\n${cardContext || '(no cards on file)'}`;
+    // Recent spend by category (last 60 days)
+    const since = new Date();
+    since.setDate(since.getDate() - 60);
+    const spendRows = await prisma.transactionCanonical.groupBy({
+      by: ['category'],
+      where: { userId: params.userId, type: 'PURCHASE', postedAt: { gte: since } },
+      _sum: { amount: true },
+    }).catch(() => [] as Array<{ category: string; _sum: { amount: unknown } }>);
+
+    const topSpend = spendRows
+      .map((r) => ({ cat: r.category, amt: Number((r._sum as { amount: unknown }).amount ?? 0) }))
+      .sort((a, b) => b.amt - a.amt)
+      .slice(0, 5)
+      .map((r) => `${r.cat} $${r.amt.toFixed(0)}`)
+      .join(', ');
+
+    const totalPts = params.cards.reduce((s, c) => s + (c.rewardBalance ?? 0), 0);
+    const totalLimit = params.cards.reduce((s, c) => s + Number(c.creditLimit ?? 0), 0);
+    const totalBal = params.cards.reduce((s, c) => s + Number(c.currentBalance), 0);
+    const util = totalLimit > 0 ? Math.round((totalBal / totalLimit) * 100) : 0;
+
+    const userContext =
+      `USER WALLET:\n${cardContext || '(no cards yet — suggest adding one from our catalog)'}\n\n` +
+      `WALLET TOTALS: ${totalPts.toLocaleString()} pts · utilization ${util}%\n` +
+      `LAST 60D SPEND: ${topSpend || '(no recent transactions)'}`;
 
     const completion = await openai.chat.completions.create({
       model: config.OPENAI_MODEL,
-      max_tokens: 400,
+      max_tokens: 420,
       messages: [
         { role: 'system', content: SYSTEM_PROMPT },
         { role: 'system', content: userContext },
@@ -53,18 +90,13 @@ class AiService {
       temperature: 0.4,
     });
 
-    const content = completion.choices[0]?.message?.content ?? 'Sorry, I could not generate a response.';
-
+    const answer =
+      completion.choices[0]?.message?.content ?? 'Sorry, I could not generate a response.';
     const suggestedFollowUps = this.generateFollowUps(params.message);
 
     return {
-      message: {
-        id: crypto.randomUUID(),
-        role: 'assistant' as const,
-        content,
-        cardReferences: [],
-        createdAt: new Date().toISOString(),
-      },
+      answer,
+      threadId: params.threadId ?? crypto.randomUUID(),
       suggestedFollowUps,
     };
   }

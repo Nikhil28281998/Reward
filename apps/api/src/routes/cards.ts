@@ -1,8 +1,42 @@
 import type { FastifyInstance } from 'fastify';
-import { UpdateCardSchema } from '@reward/shared';
+import { UpdateCardSchema, CreateCardSchema } from '@reward/shared';
 import { prisma } from '../db/client.js';
 
 export async function cardRoutes(app: FastifyInstance) {
+  // POST /v1/cards — manually add a card from the catalog
+  app.post('/v1/cards', { onRequest: [app.authenticate] }, async (req, reply) => {
+    const body = CreateCardSchema.safeParse(req.body);
+    if (!body.success) return reply.status(400).send({ error: 'Validation error', issues: body.error.flatten() });
+
+    const product = await prisma.cardProduct.findUnique({ where: { id: body.data.cardProductId } });
+    if (!product) return reply.status(404).send({ error: 'Card product not found' });
+
+    // Prevent obvious dupes (same product + same last4 if provided)
+    const existing = await prisma.cardAccount.findFirst({
+      where: {
+        userId: req.user.sub,
+        cardProductId: body.data.cardProductId,
+        ...(body.data.last4 ? { last4: body.data.last4 } : {}),
+        isActive: true,
+      },
+    });
+    if (existing) return reply.status(409).send({ error: 'You already have this card linked' });
+
+    const card = await prisma.cardAccount.create({
+      data: {
+        userId: req.user.sub,
+        cardProductId: body.data.cardProductId,
+        last4: body.data.last4 ?? null,
+        nickname: body.data.nickname ?? null,
+        creditLimit: body.data.creditLimit != null ? body.data.creditLimit : null,
+        rewardBalance: body.data.rewardBalance ?? 0,
+        openedAt: new Date(),
+      },
+      include: { cardProduct: true },
+    });
+    return reply.status(201).send({ card });
+  });
+
   // GET /v1/cards  — list all card accounts for the authenticated user
   app.get('/v1/cards', { onRequest: [app.authenticate] }, async (req, reply) => {
     const cards = await prisma.cardAccount.findMany({

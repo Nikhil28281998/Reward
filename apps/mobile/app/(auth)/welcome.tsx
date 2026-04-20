@@ -48,7 +48,7 @@ export default function WelcomeScreen() {
             <View style={styles.logoBadge}>
               <Text style={styles.logoEmoji}>💳</Text>
             </View>
-            <Text style={[styles.logoText, { fontSize: moderateScale(28) }]}>Reward</Text>
+            <Text style={[styles.logoText, { fontSize: moderateScale(28) }]}>Labhly</Text>
           </View>
 
           {/* Hero headline */}

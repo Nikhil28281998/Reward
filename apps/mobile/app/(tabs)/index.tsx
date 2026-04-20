@@ -1,40 +1,37 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
-  View, Text, StyleSheet, Pressable,
-  RefreshControl, useWindowDimensions, ScrollView,
+  View, Text, StyleSheet, Pressable, RefreshControl, ScrollView,
 } from 'react-native';
 import Animated, {
-  useSharedValue, useAnimatedScrollHandler,
-  useAnimatedStyle, interpolate, Extrapolate,
+  useSharedValue, useAnimatedScrollHandler, useAnimatedStyle,
+  interpolate, Extrapolate,
 } from 'react-native-reanimated';
+import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Colors, Typography, Spacing, Radius, Shadow } from '../../constants/theme';
 import { moderateScale, wp } from '../../lib/responsive';
 import { useCards } from '../../hooks/useCards';
-import { useSpendSummary } from '../../hooks/useLedger';
+import { useLedger, useSpendSummary } from '../../hooks/useLedger';
 import { useAuth } from '../../hooks/useAuth';
 import { CardCarousel } from '../../components/ui/CardCarousel';
-import { SpendRings } from '../../components/ui/SpendRings';
-import { QuickOptimizer } from '../../components/ui/QuickOptimizer';
 import { TransactionFeed } from '../../components/ui/TransactionFeed';
-import { useLedger } from '../../hooks/useLedger';
+import { InsightHero, type Insight } from '../../components/ui/InsightHero';
+import { CATEGORIES, formatUSD } from '@reward/shared';
 
 export default function HomeScreen() {
-  const { width } = useWindowDimensions();
   const scrollY = useSharedValue(0);
   const { user } = useAuth();
   const { cards, isLoading: cardsLoading, refetch: refetchCards } = useCards();
   const { transactions, isLoading: ledgerLoading, refetch: refetchLedger } = useLedger();
-  const { spendSummary, isLoading: spendLoading } = useSpendSummary();
+  const { spendSummary } = useSpendSummary();
   const [refreshing, setRefreshing] = useState(false);
 
-  const scrollHandler = useAnimatedScrollHandler((event) => {
-    scrollY.value = event.contentOffset.y;
-  });
+  const scrollHandler = useAnimatedScrollHandler((e) => { scrollY.value = e.contentOffset.y; });
 
-  const headerOpacity = useAnimatedStyle(() => ({
-    opacity: interpolate(scrollY.value, [0, 60], [1, 0.7], Extrapolate.CLAMP),
+  const headerStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(scrollY.value, [0, 80], [1, 0.85], Extrapolate.CLAMP),
+    transform: [{ translateY: interpolate(scrollY.value, [0, 80], [0, -4], Extrapolate.CLAMP) }],
   }));
 
   const onRefresh = useCallback(async () => {
@@ -50,32 +47,99 @@ export default function HomeScreen() {
     return 'Good evening';
   };
 
-  const firstName = user?.fullName?.split(' ')[0] ?? 'there';
-
-  const totalPoints = (cards ?? []).reduce((s, c) => s + (c.rewardBalance ?? 0), 0);
-  const estimatedValue = (totalPoints * 0.015).toFixed(0);
-  const totalBalance = (cards ?? []).reduce((s, c) => s + Number(c.currentBalance), 0);
-  const totalLimit = (cards ?? []).reduce((s, c) => s + Number(c.creditLimit ?? 0), 0);
+  const firstName = user?.fullName?.split(' ')[0] ?? '';
+  const cardList = cards ?? [];
+  const totalPoints = cardList.reduce((s, c) => s + (c.rewardBalance ?? 0), 0);
+  const estimatedValue = totalPoints * 0.015;
+  const totalLimit = cardList.reduce((s, c) => s + Number(c.creditLimit ?? 0), 0);
+  const totalBalance = cardList.reduce((s, c) => s + Number(c.currentBalance), 0);
   const utilPct = totalLimit > 0 ? Math.round((totalBalance / totalLimit) * 100) : 0;
+  const monthSpend = spendSummary?.totalSpend ?? 0;
+
+  // ─── Compute live insights from real data ─────────────────────────────────
+  const insights = useMemo<Insight[]>(() => {
+    const out: Insight[] = [];
+    if (cardList.length === 0) {
+      out.push({
+        emoji: '✨',
+        headline: 'Add your first card to unlock Labhly',
+        body: "Pick from 8+ top US rewards cards and we'll start tracking your points instantly.",
+      });
+      return out;
+    }
+
+    const topCard = [...cardList].sort((a, b) => (b.rewardBalance ?? 0) - (a.rewardBalance ?? 0))[0];
+    if (topCard && (topCard.rewardBalance ?? 0) > 0) {
+      const value = ((topCard.rewardBalance ?? 0) * 0.015).toFixed(0);
+      out.push({
+        emoji: '💎',
+        headline: `Your ${topCard.cardProduct?.name ?? 'card'} is sitting on $${value} of value`,
+        body: 'Transfer points to a partner program for up to 2× redemption value before they age out.',
+        chip: `${(topCard.rewardBalance ?? 0).toLocaleString()} pts`,
+      });
+    }
+
+    if (spendSummary?.categories?.length) {
+      const top = [...spendSummary.categories].sort((a, b) => Number((b as any).totalAmount ?? (b as any).amount ?? 0) - Number((a as any).totalAmount ?? (a as any).amount ?? 0))[0];
+      if (top) {
+        const amt = Number((top as any).totalAmount ?? (top as any).amount ?? 0);
+        const meta = CATEGORIES[top.category as keyof typeof CATEGORIES];
+        out.push({
+          emoji: meta?.emoji ?? '📊',
+          headline: `${formatUSD(amt)} on ${meta?.label ?? top.category} this month`,
+          body: 'Tap "Best card now" before your next purchase to make sure you\'re earning the top multiplier.',
+          chip: monthSpend > 0 ? `${Math.round((amt / monthSpend) * 100)}%` : undefined,
+        });
+      }
+    }
+
+    if (utilPct >= 30) {
+      out.push({
+        emoji: '⚠️',
+        headline: `Utilization is ${utilPct}% — pay down before statement closes`,
+        body: 'Keeping balances under 30% lifts your credit score within one cycle.',
+        chip: `${utilPct}%`,
+      });
+    } else if (totalLimit > 0) {
+      out.push({
+        emoji: '🛡️',
+        headline: `Credit health: utilization ${utilPct}%`,
+        body: "Lenders love this. You're in the safest band — keep doing what you're doing.",
+        chip: 'Healthy',
+      });
+    }
+
+    return out;
+  }, [cardList, spendSummary, utilPct, totalLimit, monthSpend]);
+
+  const quickActions = [
+    { id: 'best',     emoji: '⚡', label: 'Best card now',    sub: 'Per purchase',    onPress: () => router.push('/best-card') },
+    { id: 'planning', emoji: '🎯', label: 'Plan a goal',      sub: 'AI playbooks',    onPress: () => router.push('/planning') },
+    { id: 'offers',   emoji: '🎁', label: 'Activate offers',  sub: 'New deals',       onPress: () => router.push('/(tabs)/discover') },
+    { id: 'add',      emoji: '＋', label: 'Add to wallet',    sub: 'Card · bank · more', onPress: () => router.push('/add') },
+    { id: 'import',   emoji: '📄', label: 'Import documents', sub: 'Statements · offers', onPress: () => router.push('/(onboarding)/upload') },
+  ];
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      {/* Header */}
-      <Animated.View style={[styles.header, headerOpacity]}>
-        <View>
-          <Text style={[styles.greeting, { fontSize: moderateScale(13) }]}>{greeting()},</Text>
-          <Text style={[styles.name, { fontSize: moderateScale(22) }]}>{firstName} 👋</Text>
+      <Animated.View style={[styles.header, headerStyle]}>
+        <Pressable onPress={() => router.push('/profile')} hitSlop={6} style={styles.profileAvatar}>
+          <Text style={styles.profileAvatarText}>
+            {((user?.fullName ?? user?.email ?? 'U').split(' ').map((s) => s[0]).join('').slice(0, 2) || 'U').toUpperCase()}
+          </Text>
+        </Pressable>
+        <View style={{ flex: 1, marginLeft: Spacing['3'] }}>
+          <Text style={[styles.greeting, { fontSize: moderateScale(13) }]}>{greeting()}{firstName ? ',' : ''}</Text>
+          <Text style={[styles.name, { fontSize: moderateScale(22) }]}>{firstName ? `${firstName} 👋` : '👋'}</Text>
         </View>
-        <Pressable
-          onPress={() => router.push('/settings')}
-          style={styles.avatarBtn}
-          hitSlop={8}
-        >
-          <View style={styles.avatar}>
-            <Text style={[styles.avatarText, { fontSize: moderateScale(16) }]}>
-              {firstName.charAt(0).toUpperCase()}
-            </Text>
-          </View>
+        <Pressable onPress={() => router.push('/assistant')} style={styles.aiBtn} hitSlop={6}>
+          <LinearGradient
+            colors={['#4F46E5', '#7C3AED', '#10B981']}
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+            style={styles.aiBtnInner}
+          >
+            <Text style={[styles.aiBtnText, { fontSize: moderateScale(18) }]}>✦</Text>
+          </LinearGradient>
         </Pressable>
       </Animated.View>
 
@@ -83,79 +147,96 @@ export default function HomeScreen() {
         onScroll={scrollHandler}
         scrollEventThrottle={16}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={{ paddingBottom: Spacing['20'] }}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />
         }
       >
-        {/* Card Carousel */}
-        <CardCarousel cards={cards ?? []} isLoading={cardsLoading} />
+        {/* AI Insight Hero */}
+        <View style={{ marginHorizontal: wp(5), marginTop: Spacing['2'] }}>
+          <InsightHero insights={insights} />
+        </View>
 
-        {/* Stats bar */}
-        <View style={[styles.statsBar, { marginHorizontal: wp(5) }]}>
-          <View style={styles.stat}>
-            <Text style={[styles.statLabel, { fontSize: moderateScale(10) }]}>TOTAL POINTS</Text>
-            <Text style={[styles.statValue, { fontSize: moderateScale(18), color: Colors.primary }]}>
-              {totalPoints.toLocaleString()}
-            </Text>
-          </View>
-          <View style={styles.statDivider} />
-          <View style={styles.stat}>
-            <Text style={[styles.statLabel, { fontSize: moderateScale(10) }]}>EST. VALUE</Text>
-            <Text style={[styles.statValue, { fontSize: moderateScale(18), color: Colors.accent }]}>
-              ${estimatedValue}
-            </Text>
-          </View>
-          <View style={styles.statDivider} />
-          <View style={styles.stat}>
-            <Text style={[styles.statLabel, { fontSize: moderateScale(10) }]}>UTILIZATION</Text>
-            <Text
-              style={[
-                styles.statValue,
-                { fontSize: moderateScale(18) },
-                utilPct < 30
-                  ? { color: Colors.accent }
-                  : utilPct < 50
-                  ? { color: Colors.warning }
-                  : { color: Colors.danger },
-              ]}
-            >
-              {totalLimit > 0 ? `${utilPct}%` : '—'}
-            </Text>
+        {/* Wealth glass card */}
+        <View style={[styles.wealth, { marginHorizontal: wp(5) }]}>
+          <LinearGradient
+            colors={['rgba(79,70,229,0.18)', 'rgba(16,185,129,0.10)']}
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+            style={StyleSheet.absoluteFill}
+          />
+          <View style={styles.wealthRow}>
+            <View style={{ flex: 1.1 }}>
+              <Text style={[styles.wealthLabel, { fontSize: moderateScale(10) }]}>NET REWARDS VALUE</Text>
+              <Text style={[styles.wealthValue, { fontSize: moderateScale(34) }]}>
+                ${estimatedValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+              </Text>
+              <Text style={[styles.wealthSub, { fontSize: moderateScale(12) }]}>
+                {totalPoints.toLocaleString()} pts across {cardList.length} card{cardList.length === 1 ? '' : 's'}
+              </Text>
+            </View>
+            <View style={styles.wealthDivider} />
+            <View style={{ flex: 1, gap: Spacing['3'] }}>
+              <View>
+                <Text style={[styles.wealthMiniLabel, { fontSize: moderateScale(10) }]}>SPENT THIS MO</Text>
+                <Text style={[styles.wealthMiniValue, { fontSize: moderateScale(15) }]}>
+                  {formatUSD(monthSpend)}
+                </Text>
+              </View>
+              <View>
+                <Text style={[styles.wealthMiniLabel, { fontSize: moderateScale(10) }]}>UTILIZATION</Text>
+                <Text style={[
+                  styles.wealthMiniValue,
+                  { fontSize: moderateScale(15), color: utilPct < 30 ? Colors.accentLight : utilPct < 50 ? Colors.warning : Colors.danger },
+                ]}>
+                  {totalLimit > 0 ? `${utilPct}%` : '—'}
+                </Text>
+              </View>
+            </View>
           </View>
         </View>
 
-        {/* Spend Rings */}
-        <View style={styles.sectionHeader}>
-          <Text style={[styles.sectionTitle, { fontSize: moderateScale(17) }]}>This month</Text>
-          <Pressable hitSlop={8}>
-            <Text style={[styles.sectionAction, { fontSize: moderateScale(13) }]}>Mar 2026 ›</Text>
+        {/* Quick action strip */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.actionStrip}
+        >
+          {quickActions.map((a) => (
+            <Pressable
+              key={a.id}
+              style={({ pressed }) => [styles.action, { opacity: pressed ? 0.85 : 1 }]}
+              onPress={a.onPress}
+            >
+              <View style={styles.actionEmojiWrap}>
+                <Text style={[styles.actionEmoji, { fontSize: moderateScale(20) }]}>{a.emoji}</Text>
+              </View>
+              <Text style={[styles.actionLabel, { fontSize: moderateScale(12) }]}>{a.label}</Text>
+              <Text style={[styles.actionSub, { fontSize: moderateScale(10) }]}>{a.sub}</Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+
+        {/* Card carousel */}
+        <View style={styles.sectionHead}>
+          <Text style={[styles.sectionTitle, { fontSize: moderateScale(15) }]}>Your wallet</Text>
+          <Pressable hitSlop={6} onPress={() => router.push('/(tabs)/cards')}>
+            <Text style={[styles.sectionAction, { fontSize: moderateScale(12) }]}>Manage ›</Text>
           </Pressable>
         </View>
-        <SpendRings
-          categories={spendSummary?.categories ?? []}
-          totalSpend={spendSummary?.totalSpend ?? 0}
-          isLoading={spendLoading}
-          style={{ marginHorizontal: wp(5) }}
-        />
+        <CardCarousel cards={cardList} isLoading={cardsLoading} />
 
-        {/* Quick Optimizer */}
-        <QuickOptimizer cards={cards ?? []} style={{ marginTop: Spacing['6'] }} />
-
-        {/* Recent Transactions */}
-        <View style={styles.sectionHeader}>
-          <Text style={[styles.sectionTitle, { fontSize: moderateScale(17) }]}>Recent</Text>
-          <Pressable onPress={() => router.push('/(tabs)/ledger')} hitSlop={8}>
-            <Text style={[styles.sectionAction, { fontSize: moderateScale(13) }]}>See all ›</Text>
+        {/* Recent transactions (compact) */}
+        <View style={styles.sectionHead}>
+          <Text style={[styles.sectionTitle, { fontSize: moderateScale(15) }]}>Recent activity</Text>
+          <Pressable hitSlop={6} onPress={() => router.push('/(tabs)/ledger')}>
+            <Text style={[styles.sectionAction, { fontSize: moderateScale(12) }]}>See all ›</Text>
           </Pressable>
         </View>
         <TransactionFeed
-          transactions={(transactions ?? []).slice(0, 6)}
+          transactions={(transactions ?? []).slice(0, 4)}
           isLoading={ledgerLoading}
           style={{ marginHorizontal: wp(5) }}
         />
-
-        <View style={{ height: Spacing['20'] }} />
       </Animated.ScrollView>
     </SafeAreaView>
   );
@@ -163,19 +244,43 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing['4'], paddingVertical: Spacing['2'] },
+  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: Spacing['5'], paddingTop: Spacing['2'], paddingBottom: Spacing['3'] },
+  profileAvatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: Colors.primaryMuted, borderWidth: 1, borderColor: 'rgba(129,140,248,0.4)', alignItems: 'center', justifyContent: 'center' },
+  profileAvatarText: { color: Colors.primaryLight, fontWeight: '800', fontSize: 13, letterSpacing: 0.5 },
   greeting: { color: Colors.textSecondary },
   name: { color: Colors.text, fontWeight: Typography.weight.bold, letterSpacing: -0.5, marginTop: 1 },
-  avatarBtn: {},
-  avatar: { width: 38, height: 38, borderRadius: 19, backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center' },
-  avatarText: { color: Colors.white, fontWeight: Typography.weight.bold },
-  scrollContent: { paddingTop: Spacing['2'] },
-  statsBar: { flexDirection: 'row', backgroundColor: Colors.surface, borderRadius: Radius.xl, padding: Spacing['4'], marginTop: Spacing['4'], borderWidth: 1, borderColor: Colors.border, ...Shadow.sm },
-  stat: { flex: 1, alignItems: 'center' },
-  statLabel: { color: Colors.textMuted, fontWeight: Typography.weight.bold, letterSpacing: 0.5 },
-  statValue: { fontWeight: Typography.weight.bold, marginTop: 3 },
-  statDivider: { width: 1, backgroundColor: Colors.border, marginVertical: 2 },
-  sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing['4'], marginTop: Spacing['6'], marginBottom: Spacing['3'] },
-  sectionTitle: { color: Colors.text, fontWeight: Typography.weight.bold },
-  sectionAction: { color: Colors.textMuted },
+  aiBtn: { borderRadius: 22 },
+  aiBtnInner: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', ...Shadow.primaryGlow },
+  aiBtnText: { color: Colors.white, fontWeight: Typography.weight.bold },
+
+  // Wealth glass card
+  wealth: {
+    marginTop: Spacing['4'],
+    borderRadius: Radius['2xl'],
+    padding: Spacing['5'],
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(129, 140, 248, 0.22)',
+    backgroundColor: Colors.surface,
+  },
+  wealthRow: { flexDirection: 'row', alignItems: 'stretch' },
+  wealthLabel: { color: Colors.textMuted, letterSpacing: 1.2, fontWeight: Typography.weight.bold },
+  wealthValue: { color: Colors.text, fontWeight: Typography.weight.extrabold, letterSpacing: -1, marginTop: 4 },
+  wealthSub: { color: Colors.textSecondary, marginTop: 4 },
+  wealthDivider: { width: 1, backgroundColor: Colors.border, marginHorizontal: Spacing['4'] },
+  wealthMiniLabel: { color: Colors.textMuted, letterSpacing: 1, fontWeight: Typography.weight.bold },
+  wealthMiniValue: { color: Colors.text, fontWeight: Typography.weight.bold, marginTop: 2 },
+
+  // Action strip
+  actionStrip: { gap: Spacing['3'], paddingHorizontal: wp(5), paddingTop: Spacing['5'] },
+  action: { width: 96, padding: Spacing['3'], borderRadius: Radius.xl, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border, alignItems: 'flex-start' },
+  actionEmojiWrap: { width: 36, height: 36, borderRadius: 18, backgroundColor: Colors.primaryMuted, alignItems: 'center', justifyContent: 'center', marginBottom: Spacing['2'] },
+  actionEmoji: {},
+  actionLabel: { color: Colors.text, fontWeight: Typography.weight.semibold },
+  actionSub: { color: Colors.textMuted, marginTop: 2 },
+
+  // Section header
+  sectionHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: wp(5), marginTop: Spacing['6'], marginBottom: Spacing['3'] },
+  sectionTitle: { color: Colors.text, fontWeight: Typography.weight.bold, letterSpacing: -0.2 },
+  sectionAction: { color: Colors.primaryLight, fontWeight: Typography.weight.semibold },
 });
