@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { Colors, Typography, Spacing, Radius, Shadow } from '../constants/theme';
 import { moderateScale } from '../lib/responsive';
 
@@ -51,25 +51,38 @@ const CHOICES: Choice[] = [
 ];
 
 export default function AddChooser() {
+  const { scope } = useLocalSearchParams<{ scope?: string }>();
+  const isWealthScope = scope === 'wealth';
+  // Wealth tab focuses on assets/liabilities outside of credit cards
+  // (which live in the Cards tab with their own flow).
+  const choices = isWealthScope ? CHOICES.filter((c) => c.id !== 'credit') : CHOICES;
+  const heroTitle = isWealthScope
+    ? 'Add to your wealth view'
+    : 'What do you want to track?';
+  const heroSub = isWealthScope
+    ? 'Bank accounts, debit cards and investments all count toward your net worth.\nCredit cards live in the Cards tab.'
+    : 'Labhly brings your entire financial life into one AI-powered view.';
+  const topTitle = isWealthScope ? 'Add to wealth' : 'Add to wallet';
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.topBar}>
         <Pressable style={styles.iconBtn} onPress={() => router.back()} hitSlop={6}>
           <Text style={styles.iconBtnText}>‹</Text>
         </Pressable>
-        <Text style={[styles.topBarTitle, { fontSize: moderateScale(16) }]}>Add to wallet</Text>
+        <Text style={[styles.topBarTitle, { fontSize: moderateScale(16) }]}>{topTitle}</Text>
         <View style={styles.iconBtn} />
       </View>
 
       <ScrollView contentContainerStyle={{ padding: Spacing['5'], gap: Spacing['4'], paddingBottom: Spacing['20'] }}>
         <View>
-          <Text style={[styles.heroTitle, { fontSize: moderateScale(24) }]}>What do you want to track?</Text>
+          <Text style={[styles.heroTitle, { fontSize: moderateScale(24) }]}>{heroTitle}</Text>
           <Text style={[styles.heroSub, { fontSize: moderateScale(13) }]}>
-            Labhly brings your entire financial life into one AI-powered view.
+            {heroSub}
           </Text>
         </View>
 
-        {CHOICES.map((c) => (
+        {choices.map((c) => (
           <Pressable
             key={c.id}
             style={({ pressed }) => [styles.choice, { opacity: pressed ? 0.9 : 1 }]}

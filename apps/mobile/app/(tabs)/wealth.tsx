@@ -43,7 +43,7 @@ export default function WealthScreen() {
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
         <Text style={[styles.title, { fontSize: moderateScale(26) }]}>Wealth</Text>
-        <Pressable style={styles.addBtn} onPress={() => router.push('/add')} hitSlop={8}>
+        <Pressable style={styles.addBtn} onPress={() => router.push('/add?scope=wealth')} hitSlop={8}>
           <Text style={[styles.addBtnText, { fontSize: moderateScale(14) }]}>＋ Add</Text>
         </Pressable>
       </View>
@@ -77,7 +77,7 @@ export default function WealthScreen() {
               title="Start building your wealth view"
               body="Add bank accounts, debit cards, and investments to see your entire financial life in one place."
               cta="＋ Add your first account"
-              onCta={() => router.push('/add')}
+              onCta={() => router.push('/add?scope=wealth')}
             />
           </View>
         ) : null}
@@ -184,6 +184,37 @@ export default function WealthScreen() {
             </View>
           ))}
         </Section>
+
+        {/* Credit cards — read-only pointer to Cards tab */}
+        <View style={{ marginTop: Spacing['6'], marginHorizontal: wp(5) }}>
+          <View style={styles.sectionHead}>
+            <Text style={styles.sectionTitle}>Credit cards</Text>
+            <Pressable hitSlop={6} onPress={() => router.push('/(tabs)/cards')}>
+              <Text style={styles.sectionAction}>Manage in Cards tab ›</Text>
+            </Pressable>
+          </View>
+          <Pressable
+            onPress={() => router.push('/(tabs)/cards')}
+            style={[styles.row, { marginBottom: 0 }]}
+          >
+            <View style={[styles.rowIcon, { backgroundColor: '#4F46E5' }]}>
+              <Text style={styles.rowEmoji}>💳</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.rowTitle, { fontSize: moderateScale(14) }]}>
+                {(cards ?? []).length === 0
+                  ? 'No credit cards yet'
+                  : `${(cards ?? []).length} credit card${(cards ?? []).length === 1 ? '' : 's'}`}
+              </Text>
+              <Text style={[styles.rowSub, { fontSize: moderateScale(11) }]}>
+                Balances counted as liabilities in net worth above.
+              </Text>
+            </View>
+            <Text style={[styles.rowValue, { fontSize: moderateScale(14), color: Colors.dangerLight }]}>
+              −{formatUSD(liabilities)}
+            </Text>
+          </Pressable>
+        </View>
 
         {!empty ? (
           <Text style={[styles.footerHint, { fontSize: moderateScale(11) }]}>

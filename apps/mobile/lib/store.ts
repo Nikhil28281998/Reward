@@ -88,6 +88,19 @@ export type DebitCard = {
   rewardsNote?: string;
 };
 
+export type ManualCreditCard = {
+  id: string;
+  type: 'credit-manual';
+  issuer: string;
+  name: string;
+  nickname?: string;
+  last4?: string;
+  creditLimit?: number;
+  annualFee?: number;
+  currentBalance?: number;
+  rewardsNote?: string;
+};
+
 export type BankAccount = {
   id: string;
   type: 'checking' | 'savings';
@@ -113,12 +126,15 @@ interface WealthState {
   debitCards: DebitCard[];
   bankAccounts: BankAccount[];
   investments: Investment[];
+  manualCreditCards: ManualCreditCard[];
   addDebitCard: (card: Omit<DebitCard, 'id' | 'type'>) => void;
   addBankAccount: (acct: Omit<BankAccount, 'id'>) => void;
   addInvestment: (inv: Omit<Investment, 'id'>) => void;
+  addManualCreditCard: (card: Omit<ManualCreditCard, 'id' | 'type'>) => void;
   removeDebitCard: (id: string) => void;
   removeBankAccount: (id: string) => void;
   removeInvestment: (id: string) => void;
+  removeManualCreditCard: (id: string) => void;
 }
 
 const genId = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
@@ -138,17 +154,27 @@ export const useWealthStore = create<WealthState>()(
       debitCards: [],
       bankAccounts: [],
       investments: [],
+      manualCreditCards: [],
       addDebitCard: (card) =>
         set((s) => ({ debitCards: [...s.debitCards, { ...card, id: genId(), type: 'debit' }] })),
       addBankAccount: (acct) =>
         set((s) => ({ bankAccounts: [...s.bankAccounts, { ...acct, id: genId() }] })),
       addInvestment: (inv) =>
         set((s) => ({ investments: [...s.investments, { ...inv, id: genId() }] })),
+      addManualCreditCard: (card) =>
+        set((s) => ({
+          manualCreditCards: [
+            ...s.manualCreditCards,
+            { ...card, id: genId(), type: 'credit-manual' },
+          ],
+        })),
       removeDebitCard: (id) => set((s) => ({ debitCards: s.debitCards.filter((c) => c.id !== id) })),
       removeBankAccount: (id) =>
         set((s) => ({ bankAccounts: s.bankAccounts.filter((a) => a.id !== id) })),
       removeInvestment: (id) =>
         set((s) => ({ investments: s.investments.filter((i) => i.id !== id) })),
+      removeManualCreditCard: (id) =>
+        set((s) => ({ manualCreditCards: s.manualCreditCards.filter((c) => c.id !== id) })),
     }),
     {
       name: 'labhly_wealth_v1',
@@ -157,6 +183,7 @@ export const useWealthStore = create<WealthState>()(
         debitCards: s.debitCards,
         bankAccounts: s.bankAccounts,
         investments: s.investments,
+        manualCreditCards: s.manualCreditCards,
       }),
     },
   ),
