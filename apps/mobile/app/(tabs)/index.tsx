@@ -163,7 +163,7 @@ export default function HomeScreen() {
     { id: 'best',     emoji: '⚡', label: 'Best card now',    sub: 'Per purchase',    onPress: () => router.push('/best-card') },
     { id: 'planning', emoji: '🎯', label: 'Plan a goal',      sub: 'AI playbooks',    onPress: () => router.push('/planning') },
     { id: 'offers',   emoji: '🎁', label: 'Activate offers',  sub: 'New deals',       onPress: () => router.push('/(tabs)/discover') },
-    { id: 'add',      emoji: '＋', label: 'Add to wallet',    sub: 'Card · bank · more', onPress: () => router.push('/add') },
+    { id: 'add',      emoji: '＋', label: 'Add account',      sub: 'Card · bank · more', onPress: () => router.push('/add') },
     { id: 'import',   emoji: '📄', label: 'Import documents', sub: 'Statements · offers', onPress: () => router.push('/(onboarding)/upload') },
   ];
 
@@ -300,7 +300,7 @@ export default function HomeScreen() {
 
         {/* Card carousel */}
         <View style={styles.sectionHead}>
-          <Text style={[styles.sectionTitle, { fontSize: moderateScale(15) }]}>Your wallet</Text>
+          <Text style={[styles.sectionTitle, { fontSize: moderateScale(15) }]}>My cards</Text>
           <Pressable hitSlop={6} onPress={() => router.push('/(tabs)/cards')}>
             <Text style={[styles.sectionAction, { fontSize: moderateScale(12) }]}>Manage ›</Text>
           </Pressable>

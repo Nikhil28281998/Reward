@@ -9,6 +9,8 @@ import { api } from '../lib/api';
 import { CATEGORIES, formatUSD, type SpendCategory } from '@reward/shared';
 import { AIAvatar } from '../components/ui/AIAvatar';
 import { rewardCurrencyLabel } from '../lib/format';
+import { usePremiumStore } from '../lib/store';
+import { PremiumPaywall } from '../components/ui/PremiumPaywall';
 
 // Replace raw enum strings (e.g. "CAPITAL_ONE_MILES") in reasoning text with
 // human-readable labels so users never see SHOUTY_SNAKE_CASE in the UI.
@@ -39,8 +41,14 @@ export default function BestCardScreen() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<BestResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const isPremium = usePremiumStore((s) => s.tier === 'premium');
+  const [paywallOpen, setPaywallOpen] = useState(!isPremium);
 
   const findBest = async () => {
+    if (!isPremium) {
+      setPaywallOpen(true);
+      return;
+    }
     const amt = Number(amount);
     if (!category || !Number.isFinite(amt) || amt <= 0) return;
     setLoading(true);
@@ -181,6 +189,11 @@ export default function BestCardScreen() {
           </View>
         )}
       </ScrollView>
+      <PremiumPaywall
+        visible={paywallOpen}
+        onClose={() => { setPaywallOpen(false); if (!isPremium) router.back(); }}
+        reason="Best-card recommendations use Labhly's AI — unlock them with Premium."
+      />
     </SafeAreaView>
   );
 }

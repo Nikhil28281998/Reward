@@ -9,9 +9,10 @@ import { router } from 'expo-router';
 import { Colors, Typography, Spacing, Radius } from '../constants/theme';
 import { moderateScale, wp } from '../lib/responsive';
 import { api } from '../lib/api';
-import { useUIStore } from '../lib/store';
+import { useUIStore, usePremiumStore } from '../lib/store';
 import { useCards } from '../hooks/useCards';
 import { AIAvatar } from '../components/ui/AIAvatar';
+import { PremiumPaywall } from '../components/ui/PremiumPaywall';
 
 interface Message {
   id: string;
@@ -33,6 +34,8 @@ export default function AssistantScreen() {
   const insets = useSafeAreaInsets();
   const { cards } = useCards();
   const { assistantThreadId, setAssistantThreadId } = useUIStore();
+  const isPremium = usePremiumStore((s) => s.tier === 'premium');
+  const [paywallOpen, setPaywallOpen] = useState(!isPremium);
 
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -56,6 +59,10 @@ export default function AssistantScreen() {
     async (text: string) => {
       const trimmed = text.trim();
       if (!trimmed || isLoading) return;
+      if (!isPremium) {
+        setPaywallOpen(true);
+        return;
+      }
 
       const userMsg: Message = { id: Date.now().toString(), role: 'user', content: trimmed };
       setMessages((prev) => [...prev, userMsg]);
@@ -267,6 +274,11 @@ export default function AssistantScreen() {
           AI rewards guidance only. Not financial or investment advice.
         </Text>
       </KeyboardAvoidingView>
+      <PremiumPaywall
+        visible={paywallOpen}
+        onClose={() => { setPaywallOpen(false); if (!isPremium) router.back(); }}
+        reason="The AI Assistant is a Premium feature. Unlock unlimited personalized rewards guidance for your wallet."
+      />
     </SafeAreaView>
   );
 }

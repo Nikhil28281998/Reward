@@ -166,6 +166,8 @@ export default function PlanningScreen() {
     }
     setOpenFw(null);
     setIncomeDraft('');
+    // Jump to the detail view so the user immediately sees their plan with data
+    router.push(`/planning/${fw.id}`);
   };
 
   return (
@@ -245,7 +247,7 @@ export default function PlanningScreen() {
             return (
               <Pressable
                 key={fw.id}
-                onPress={() => setOpenFw(fw)}
+                onPress={() => adopted ? router.push(`/planning/${fw.id}`) : setOpenFw(fw)}
                 style={({ pressed }) => [styles.fwRow, { opacity: pressed ? 0.85 : 1 }]}
               >
                 <View style={[styles.fwIcon, { backgroundColor: `${fw.colors[0]}33`, borderColor: `${fw.colors[0]}55` }]}>
@@ -253,7 +255,9 @@ export default function PlanningScreen() {
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.fwTitle, { fontSize: moderateScale(14) }]}>{fw.title}</Text>
-                  <Text style={[styles.fwSub, { fontSize: moderateScale(12) }]}>{fw.sub}</Text>
+                  <Text style={[styles.fwSub, { fontSize: moderateScale(12) }]}>
+                    {adopted ? 'Tap to see live progress →' : fw.sub}
+                  </Text>
                 </View>
                 {adopted ? (
                   <View style={styles.fwBadge}>

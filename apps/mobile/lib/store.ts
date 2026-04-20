@@ -235,3 +235,35 @@ export const usePlansStore = create<PlansState>()(
     },
   ),
 );
+
+// ─── Premium Store (AI gating: $4.99/mo regular, $0.99/mo promo) ────────────
+
+export const PREMIUM_PRICE_REGULAR_CENTS = 499;
+export const PREMIUM_PRICE_PROMO_CENTS = 99;
+
+type PremiumTier = 'free' | 'premium';
+
+interface PremiumState {
+  tier: PremiumTier;
+  promoEligible: boolean; // true during launch window
+  activate: () => void; // simulates purchase for MVP
+  cancel: () => void;
+  isPremium: () => boolean;
+}
+
+export const usePremiumStore = create<PremiumState>()(
+  persist(
+    (set, get) => ({
+      tier: 'free',
+      promoEligible: true,
+      activate: () => set({ tier: 'premium' }),
+      cancel: () => set({ tier: 'free' }),
+      isPremium: () => get().tier === 'premium',
+    }),
+    {
+      name: 'labhly_premium_v1',
+      storage: webStorage,
+      partialize: (s) => ({ tier: s.tier, promoEligible: s.promoEligible }),
+    },
+  ),
+);

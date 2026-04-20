@@ -7,6 +7,8 @@ import { Colors, Typography, Spacing, Radius } from '../constants/theme';
 import { moderateScale, wp } from '../lib/responsive';
 import { useAuth } from '../hooks/useAuth';
 import { useCards } from '../hooks/useCards';
+import { usePremiumStore, PREMIUM_PRICE_PROMO_CENTS, PREMIUM_PRICE_REGULAR_CENTS } from '../lib/store';
+import { PremiumPaywall } from '../components/ui/PremiumPaywall';
 
 type Row = {
   icon: string;
@@ -61,6 +63,11 @@ function Section({ title, rows }: { title: string; rows: Row[] }) {
 export default function ProfileScreen() {
   const { user, signOut } = useAuth();
   const { cards } = useCards();
+  const premiumTier = usePremiumStore((s) => s.tier);
+  const promoEligible = usePremiumStore((s) => s.promoEligible);
+  const cancelPremium = usePremiumStore((s) => s.cancel);
+  const isPremium = premiumTier === 'premium';
+  const [paywallOpen, setPaywallOpen] = useState(false);
 
   const [notifTx, setNotifTx] = useState(true);
   const [notifOffers, setNotifOffers] = useState(true);
@@ -140,7 +147,7 @@ export default function ProfileScreen() {
                 <Text style={styles.heroStatLabel}>verified</Text>
               </View>
               <View style={styles.heroStat}>
-                <Text style={styles.heroStatVal}>Free</Text>
+                <Text style={styles.heroStatVal}>{isPremium ? 'Pro' : 'Free'}</Text>
                 <Text style={styles.heroStatLabel}>plan</Text>
               </View>
             </View>
@@ -152,7 +159,33 @@ export default function ProfileScreen() {
           rows={[
             { icon: '👤', label: 'Edit profile', sub: 'Name, photo, timezone', onPress: () => Alert.alert('Coming soon', 'Profile editing is on the roadmap.') },
             { icon: '📧', label: 'Email', value: user?.email ?? '—' },
-            { icon: '💎', label: 'Upgrade to Labhly Pro', sub: 'Unlimited AI queries, portfolio sync', onPress: () => Alert.alert('Coming soon', 'Pro launches next month — join the waitlist.') },
+            isPremium
+              ? {
+                  icon: '💎',
+                  label: 'Labhly Premium — active',
+                  sub: 'AI Assistant, Best-card, unlimited insights',
+                  onPress: () => {
+                    const confirm = Platform.OS === 'web'
+                      ? (typeof window !== 'undefined' && window.confirm('Cancel Premium? You can reactivate anytime.'))
+                      : true;
+                    if (!confirm) return;
+                    if (Platform.OS === 'web') { cancelPremium(); }
+                    else {
+                      Alert.alert('Cancel Premium?', 'You can reactivate anytime.', [
+                        { text: 'Keep premium', style: 'cancel' },
+                        { text: 'Cancel', style: 'destructive', onPress: () => cancelPremium() },
+                      ]);
+                    }
+                  },
+                }
+              : {
+                  icon: '💎',
+                  label: 'Upgrade to Labhly Premium',
+                  sub: promoEligible
+                    ? `Launch offer — $${(PREMIUM_PRICE_PROMO_CENTS / 100).toFixed(2)}/mo (reg. $${(PREMIUM_PRICE_REGULAR_CENTS / 100).toFixed(2)})`
+                    : `$${(PREMIUM_PRICE_REGULAR_CENTS / 100).toFixed(2)}/mo · unlock AI Assistant + Best-card`,
+                  onPress: () => setPaywallOpen(true),
+                },
           ]}
         />
 
@@ -195,6 +228,12 @@ export default function ProfileScreen() {
 
         <Text style={[styles.version, { fontSize: moderateScale(11) }]}>Labhly v0.1.0 · © 2026</Text>
       </ScrollView>
+
+      <PremiumPaywall
+        visible={paywallOpen}
+        onClose={() => setPaywallOpen(false)}
+        reason="Upgrade your account to unlock Labhly's AI features."
+      />
     </SafeAreaView>
   );
 }

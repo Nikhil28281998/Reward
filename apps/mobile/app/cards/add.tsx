@@ -177,7 +177,6 @@ export default function AddCardScreen() {
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<Filter>('All');
   const [picked, setPicked] = useState<CardProduct | null>(null);
-  const [manualOpen, setManualOpen] = useState(false);
   const { data: products, isLoading } = useCardCatalog(query);
 
   const filtered = useMemo(() => {
@@ -249,15 +248,15 @@ export default function AddCardScreen() {
           ListHeaderComponent={
             <Pressable
               style={({ pressed }) => [styles.manualTile, { opacity: pressed ? 0.9 : 1 }]}
-              onPress={() => setManualOpen(true)}
+              onPress={() => router.replace('/cards/scan?mode=manual')}
             >
               <Text style={styles.manualEmoji}>✍️</Text>
               <View style={{ flex: 1 }}>
                 <Text style={[styles.manualTitle, { fontSize: moderateScale(14) }]}>
-                  Can't find your card? Add it manually
+                  Can't find your card? Enter it manually
                 </Text>
                 <Text style={[styles.manualSub, { fontSize: moderateScale(11) }]}>
-                  Enter issuer, name, limit and fee — we'll track it in your wallet.
+                  Opens the scan screen with the manual-entry tab.
                 </Text>
               </View>
               <Text style={styles.manualChev}>›</Text>
@@ -273,179 +272,7 @@ export default function AddCardScreen() {
       )}
 
       <AddCardSheet product={picked} onClose={() => setPicked(null)} />
-      <ManualCardSheet visible={manualOpen} onClose={() => setManualOpen(false)} />
     </SafeAreaView>
-  );
-}
-
-function ManualCardSheet({ visible, onClose }: { visible: boolean; onClose: () => void }) {
-  const addManual = useWealthStore((s) => s.addManualCreditCard);
-  const [issuer, setIssuer] = useState('');
-  const [name, setName] = useState('');
-  const [nickname, setNickname] = useState('');
-  const [last4, setLast4] = useState('');
-  const [limit, setLimit] = useState('');
-  const [fee, setFee] = useState('');
-  const [rewards, setRewards] = useState('');
-  const [err, setErr] = useState<string | null>(null);
-
-  const reset = () => {
-    setIssuer(''); setName(''); setNickname(''); setLast4('');
-    setLimit(''); setFee(''); setRewards(''); setErr(null);
-  };
-
-  const handleSave = () => {
-    setErr(null);
-    if (!issuer.trim() || !name.trim()) {
-      setErr('Issuer and card name are required.');
-      return;
-    }
-    const cleanLast4 = last4.replace(/\D/g, '').slice(0, 4);
-    if (cleanLast4 && cleanLast4.length !== 4) {
-      setErr('Last 4 must be 4 digits, or leave it blank.');
-      return;
-    }
-    const limitNum = parseFloat(limit.replace(/[^0-9.]/g, ''));
-    const feeNum = parseFloat(fee.replace(/[^0-9.]/g, ''));
-    addManual({
-      issuer: issuer.trim(),
-      name: name.trim(),
-      nickname: nickname.trim() || undefined,
-      last4: cleanLast4 || undefined,
-      creditLimit: !isNaN(limitNum) && limitNum > 0 ? limitNum : undefined,
-      annualFee: !isNaN(feeNum) && feeNum >= 0 ? feeNum : undefined,
-      rewardsNote: rewards.trim() || undefined,
-    });
-    reset();
-    onClose();
-    router.back();
-  };
-
-  if (!visible) return null;
-
-  return (
-    <Modal animationType="slide" transparent visible onRequestClose={onClose}>
-      <Pressable style={styles.sheetBackdrop} onPress={onClose}>
-        <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
-          <View style={styles.sheetHandle} />
-          <LinearGradient
-            colors={['#4F46E5', '#7C3AED']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.sheetVisual}
-          >
-            <Text style={[styles.sheetIssuer, { fontSize: moderateScale(11) }]}>MANUAL ENTRY</Text>
-            <Text style={[styles.sheetName, { fontSize: moderateScale(20) }]}>
-              Add your own credit card
-            </Text>
-          </LinearGradient>
-
-          <ScrollView contentContainerStyle={{ padding: Spacing['5'], gap: Spacing['4'] }}>
-            <View style={{ flexDirection: 'row', gap: Spacing['3'] }}>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.sheetLabel, { fontSize: moderateScale(12) }]}>ISSUER *</Text>
-                <TextInput
-                  value={issuer}
-                  onChangeText={setIssuer}
-                  placeholder="e.g. Apple"
-                  placeholderTextColor={Colors.textMuted}
-                  style={[styles.sheetInput, { fontSize: moderateScale(15) }]}
-                  maxLength={30}
-                />
-              </View>
-              <View style={{ flex: 1.4 }}>
-                <Text style={[styles.sheetLabel, { fontSize: moderateScale(12) }]}>CARD NAME *</Text>
-                <TextInput
-                  value={name}
-                  onChangeText={setName}
-                  placeholder="e.g. Apple Card"
-                  placeholderTextColor={Colors.textMuted}
-                  style={[styles.sheetInput, { fontSize: moderateScale(15) }]}
-                  maxLength={40}
-                />
-              </View>
-            </View>
-
-            <View>
-              <Text style={[styles.sheetLabel, { fontSize: moderateScale(12) }]}>NICKNAME (optional)</Text>
-              <TextInput
-                value={nickname}
-                onChangeText={setNickname}
-                placeholder="e.g. Daily driver"
-                placeholderTextColor={Colors.textMuted}
-                style={[styles.sheetInput, { fontSize: moderateScale(15) }]}
-                maxLength={40}
-              />
-            </View>
-
-            <View style={{ flexDirection: 'row', gap: Spacing['3'] }}>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.sheetLabel, { fontSize: moderateScale(12) }]}>LAST 4</Text>
-                <TextInput
-                  value={last4}
-                  onChangeText={(t) => setLast4(t.replace(/\D/g, '').slice(0, 4))}
-                  placeholder="••••"
-                  placeholderTextColor={Colors.textMuted}
-                  style={[styles.sheetInput, { fontSize: moderateScale(15) }]}
-                  keyboardType="number-pad"
-                  inputMode="numeric"
-                  maxLength={4}
-                />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.sheetLabel, { fontSize: moderateScale(12) }]}>LIMIT ($)</Text>
-                <TextInput
-                  value={limit}
-                  onChangeText={setLimit}
-                  placeholder="10000"
-                  placeholderTextColor={Colors.textMuted}
-                  style={[styles.sheetInput, { fontSize: moderateScale(15) }]}
-                  keyboardType="decimal-pad"
-                />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.sheetLabel, { fontSize: moderateScale(12) }]}>FEE ($)</Text>
-                <TextInput
-                  value={fee}
-                  onChangeText={setFee}
-                  placeholder="0"
-                  placeholderTextColor={Colors.textMuted}
-                  style={[styles.sheetInput, { fontSize: moderateScale(15) }]}
-                  keyboardType="decimal-pad"
-                />
-              </View>
-            </View>
-
-            <View>
-              <Text style={[styles.sheetLabel, { fontSize: moderateScale(12) }]}>REWARDS NOTE (optional)</Text>
-              <TextInput
-                value={rewards}
-                onChangeText={setRewards}
-                placeholder="e.g. 3% on Apple purchases, 2% Apple Pay"
-                placeholderTextColor={Colors.textMuted}
-                style={[styles.sheetInput, { fontSize: moderateScale(15) }]}
-                maxLength={120}
-              />
-            </View>
-
-            <Pressable
-              style={({ pressed }) => [styles.sheetCta, { opacity: pressed ? 0.7 : 1 }]}
-              onPress={handleSave}
-            >
-              <Text style={[styles.sheetCtaText, { fontSize: moderateScale(15) }]}>Save to wallet</Text>
-            </Pressable>
-            {err ? (
-              <View style={{ backgroundColor: Colors.dangerMuted, padding: Spacing['3'], borderRadius: Radius.md }}>
-                <Text style={{ color: Colors.dangerLight, fontSize: moderateScale(12) }}>{err}</Text>
-              </View>
-            ) : null}
-            <Text style={[styles.sheetNote, { fontSize: moderateScale(11) }]}>
-              Stored only on this device. Counts toward your wallet overview.
-            </Text>
-          </ScrollView>
-        </Pressable>
-      </Pressable>
-    </Modal>
   );
 }
 
